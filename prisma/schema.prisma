@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Batch {
+  id        String   @id @default(cuid())
+  name      String
+  year      Int
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  employeeId     String   @unique
+  name           String
+  email          String   @unique
+  avatarUrl      String?
+  passwordHash   String?
+  authProviderId String?
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  batchId String?
+  batch   Batch?  @relation(fields: [batchId], references: [id])
+
+  roles             UserRole[]
+  tasksCreated      Task[]            @relation("TaskCreatedBy")
+  taskAssignments   TaskAssignment[]  @relation("AssignedUser")
+  tasksAssignedByMe TaskAssignment[]  @relation("AssignedBy")
+  taskSubmissions   TaskSubmission[]  @relation("SubmissionUser")
+  taskReviews       TaskReview[]      @relation("ReviewUser")
+  auraTransactions  AuraTransaction[]
+  userBadges        UserBadge[]
+
+  teamMembers   TeamMember[]
+  teamsCreated  Team[]         @relation("TeamCreatedBy")
+  redemptions   Redemption[]
+  kudosGiven    Kudos[]        @relation("KudosGiven")
+  kudosReceived Kudos[]        @relation("KudosReceived")
+  notifications Notification[]
+  notificationPreferences NotificationPreference[]
+  auditLogs     AuditLog[]
+}
+
+model Role {
+  id   String @id @default(cuid())
+  name String @unique
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id   String @id @default(cuid())
+  name String @unique
+
+  roles RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+// ---------------------------------------------------------
+// PHASE 02: TASK SYSTEM
+// ---------------------------------------------------------
+
+model Task {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?
+  instructions String?
+  category     String?
+  baseAura     Int       @default(0)
+  difficulty   String?
+  deadline     DateTime?
+  status       String    @default("ACTIVE")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdById String
+  createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  assignments TaskAssignment[]
+}
+
+model TaskAssignment {
+  id          String    @id @default(cuid())
+  status      String    @default("ASSIGNED")
+  dueAt       DateTime?
+  assignedAt  DateTime  @default(now())
+  completedAt DateTime?
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id])
+
+  userId String
+  user   User   @relation("AssignedUser", fields: [userId], references: [id])
+
+  assignedById String
+  assignedBy   User   @relation("AssignedBy", fields: [assignedById], references: [id])
+
+  submissions TaskSubmission[]
+}
+
+model TaskSubmission {
+  id            String   @id @default(cuid())
+  content       String?
+  attachmentUrl String?
+  submittedAt   DateTime @default(now())
+  version       Int      @default(1)
+
+  assignmentId String
+  assignment   TaskAssignment @relation(fields: [assignmentId], references: [id])
+
+  submittedById String
+  submittedBy   User   @relation("SubmissionUser", fields: [submittedById], references: [id])
+
+  reviews TaskReview[]
+}
+
+model TaskReview {
+  id         String   @id @default(cuid())
+  status     String // APPROVED, NEEDS_CHANGES
+  score      Int?
+  feedback   String?
+  reviewedAt DateTime @default(now())
+
+  submissionId String
+  submission   TaskSubmission @relation(fields: [submissionId], references: [id])
+
+  reviewerId String
+  reviewer   User   @relation("ReviewUser", fields: [reviewerId], references: [id])
+}
+
+// ---------------------------------------------------------
+// PHASE 03: AURA LEDGER
+// ---------------------------------------------------------
+
+model AuraTransaction {
+  id          String   @id @default(cuid())
+  type        String // TASK_REWARD, BONUS, BADGE_REWARD, KUDOS, REDEMPTION, ADMIN_ADJUSTMENT, REVERSAL
+  amount      Int
+  sourceType  String?
+  sourceId    String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+// ---------------------------------------------------------
+// PHASE 04: GAMIFICATION
+// ---------------------------------------------------------
+
+model Badge {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  description   String?
+  icon          String?
+  criteriaType  String?
+  criteriaValue String?
+  auraReward    Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  awardedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  badgeId String
+  badge   Badge  @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
+}
+
+// ---------------------------------------------------------
+// PHASE 05: TEAMS / SOCIAL
+// ---------------------------------------------------------
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String?
+  createdAt   DateTime @default(now())
+
+  createdById String
+  createdBy   User   @relation("TeamCreatedBy", fields: [createdById], references: [id])
+
+  members TeamMember[]
+}
+
+model TeamMember {
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
+
+  @@id([teamId, userId])
+}
+
+model Kudos {
+  id        String   @id @default(cuid())
+  message   String?
+  createdAt DateTime @default(now())
+
+  senderId String
+  sender   User   @relation("KudosGiven", fields: [senderId], references: [id])
+
+  receiverId String
+  receiver   User   @relation("KudosReceived", fields: [receiverId], references: [id])
+}
+
+// ---------------------------------------------------------
+// PHASE 06: STORE
+// ---------------------------------------------------------
+
+model StoreItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String?
+  category    String?
+  basePrice   Int
+  stock       Int      @default(0)
+  status      String   @default("ACTIVE")
+  maxPerUser  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  redemptions Redemption[]
+}
+
+model Redemption {
+  id          String    @id @default(cuid())
+  auraCost    Int
+  status      String    @default("PENDING") // PENDING, FULFILLED, CANCELLED
+  redeemedAt  DateTime  @default(now())
+  fulfilledAt DateTime?
+  cancelledAt DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  storeItemId String
+  storeItem   StoreItem @relation(fields: [storeItemId], references: [id])
+}
+
+// ---------------------------------------------------------
+// PHASE 07: PLATFORM SERVICES
+// ---------------------------------------------------------
+
+model Notification {
+  id        String    @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  metadata  Json?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  deliveries NotificationDelivery[]
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id])
+}
+
+model NotificationPreference {
+  id               String   @id @default(cuid())
+  notificationType String
+  emailEnabled     Boolean  @default(true)
+  inAppEnabled     Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationType])
+}
+
+model NotificationDelivery {
+  id           String    @id @default(cuid())
+  channel      String    // e.g., "EMAIL"
+  status       String    @default("PENDING") // PENDING, PROCESSING, SENT, FAILED
+  attempts     Int       @default(0)
+  errorDetails String?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel])
+}

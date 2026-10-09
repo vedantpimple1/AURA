@@ -1,69 +1,116 @@
-import Image from "next/image";
+import { AuraApp } from "@/components/aura/aura-app";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getUsersAction } from "@/actions/user.actions";
+import { getAuraBalanceAction, getAuraHistoryAction } from "@/actions/aura.actions";
+import { getTasksAction } from "@/actions/task.actions";
+import { getStoreItemsAction, getAllRedemptionsAction, getUserRedemptionsAction } from "@/actions/store.actions";
+import { getTeamsAction, getKudosAction } from "@/actions/team.actions";
+import { getUserNotificationsAction, getUserPreferencesAction } from "@/actions/notification.actions";
+import { getDeliverySummaryAction, getDeliveriesAction } from "@/actions/observability.actions";
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  // Resolve params first so we can use them in the login redirect URL
+  const resolvedParams = searchParams ? await searchParams : {};
+  const session = await getSession();
+
+  if (!session) {
+    const tab = resolvedParams?.tab ? `/?tab=${resolvedParams.tab}` : '/';
+    redirect(`/login?redirect=${encodeURIComponent(tab)}`);
+  }
+
+  let rawTab = resolvedParams.tab || "home";
+
+  let primaryRole = "Member";
+  if (session.roles?.includes("SUPERADMIN")) {
+    primaryRole = "Superadmin";
+  } else if (session.roles?.includes("ADMIN")) {
+    primaryRole = "Admin";
+  }
+
+  // Admin tabs (reviews, members, analytics, audit, deliveries) are restricted from Members.
+  if (["reviews", "members", "analytics", "audit", "deliveries"].includes(rawTab) && primaryRole === "Member") {
+    rawTab = "home";
+  }
+  const initialTab = rawTab;
+  
+  const usersRes = await getUsersAction();
+  const realUsers = usersRes.success ? usersRes.data : [];
+
+  const auraRes = await getAuraBalanceAction();
+  const initialAuraBalance = auraRes.success ? auraRes.data : 0;
+
+  const historyRes = await getAuraHistoryAction();
+  const initialHistory = historyRes.success ? historyRes.data : [];
+
+  const tasksRes = await getTasksAction();
+  const initialTasks = tasksRes.success ? tasksRes.data : [];
+
+  const storeRes = await getStoreItemsAction();
+  const initialStoreItems = storeRes.success ? storeRes.data : [];
+
+  let initialRedemptions: any[] = [];
+  if (primaryRole === "Admin" || primaryRole === "Superadmin") {
+    const redemptionsRes = await getAllRedemptionsAction();
+    if (redemptionsRes.success && redemptionsRes.data) {
+      initialRedemptions = redemptionsRes.data;
+    }
+  } else {
+    const redemptionsRes = await getUserRedemptionsAction();
+    if (redemptionsRes.success && redemptionsRes.data) {
+      initialRedemptions = redemptionsRes.data;
+    }
+  }
+
+  const teamsRes = await getTeamsAction();
+  const initialTeams = teamsRes.success ? teamsRes.data : [];
+
+  const kudosRes = await getKudosAction();
+  const initialKudos = kudosRes.success ? kudosRes.data : [];
+
+  const notifRes = await getUserNotificationsAction();
+  const initialNotifications = notifRes.success && notifRes.data ? notifRes.data : [];
+
+  const prefRes = await getUserPreferencesAction();
+  const initialPreferences = prefRes.success && prefRes.data ? prefRes.data : [];
+
+  let initialDeliverySummary = null;
+  let initialDeliveriesData = null;
+
+  if (primaryRole === "Admin" || primaryRole === "Superadmin") {
+    const [summaryRes, deliveriesRes] = await Promise.all([
+      getDeliverySummaryAction(),
+      getDeliveriesAction({ page: 1, pageSize: 20 }),
+    ]);
+    if (summaryRes.success && summaryRes.data) {
+      initialDeliverySummary = summaryRes.data;
+    }
+    if (deliveriesRes.success && deliveriesRes.data) {
+      initialDeliveriesData = deliveriesRes.data;
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <AuraApp
+      initialRole={primaryRole}
+      userName={session.email}
+      initialUsers={realUsers}
+      initialAuraBalance={initialAuraBalance}
+      initialHistory={initialHistory}
+      initialTasks={initialTasks}
+      initialStoreItems={initialStoreItems}
+      initialRedemptions={initialRedemptions}
+      initialTeams={initialTeams}
+      initialKudos={initialKudos}
+      initialNotifications={initialNotifications}
+      initialPreferences={initialPreferences}
+      initialDeliverySummary={initialDeliverySummary}
+      initialDeliveriesData={initialDeliveriesData}
+      initialTab={initialTab}
+    />
   );
 }
