@@ -315,6 +315,25 @@ export function AuraApp({
           </div>
           <h1 className="hidden font-bold lg:block">{nav.find((x) => x[0] === page)?.[1]}</h1>
           <div className="flex items-center gap-3">
+            {/* Top Member Balance Badge */}
+            {role === "Member" && (
+              <button
+                onClick={() => setPage("history")}
+                className="group relative flex items-center gap-2 rounded-xl border border-amber-300/80 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-sm transition hover:scale-105 hover:border-amber-400"
+                title="Your available Aura balance — click to view history"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
+                </span>
+                <span className="text-sm">✨</span>
+                <span className="font-extrabold text-orange-950 tracking-tight">
+                  {(initialAuraBalance || 0).toLocaleString()}
+                </span>
+                <span className="hidden font-semibold text-orange-800/90 sm:inline">Aura</span>
+              </button>
+            )}
+
             {/* Interactive Search Bar */}
             <div className="relative hidden sm:block">
               <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-600 transition focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-100">
@@ -880,7 +899,7 @@ function Avatar({ name }: { name: string }) {
 function MemberHome({
   go,
   open,
-  balance,
+  balance = 0,
   initialTasks,
   userName,
   topTeam,
@@ -894,59 +913,148 @@ function MemberHome({
 }) {
   const displayName = userName ? (userName.includes("@") ? userName.split("@")[0] : userName) : "✨";
 
+  // Innovative Gamified Aura Tier System
+  const tiers = [
+    { name: "Spark Initiate", min: 0, max: 2000, level: 1 },
+    { name: "Blaze Catalyst", min: 2000, max: 5000, level: 2 },
+    { name: "Aurora Achiever", min: 5000, max: 10000, level: 3 },
+    { name: "AI Champion", min: 10000, max: 15000, level: 4 },
+    { name: "Radiant Luminary", min: 15000, max: 25000, level: 5 },
+  ];
+  const currentTier = tiers.find((t) => (balance || 0) >= t.min && (balance || 0) < t.max) || tiers[tiers.length - 1];
+  const nextTier = tiers.find((t) => t.level === currentTier.level + 1) || null;
+  const progressPercent = nextTier
+    ? Math.min(100, Math.max(0, Math.round((((balance || 0) - currentTier.min) / (nextTier.min - currentTier.min)) * 100)))
+    : 100;
+  const auraToNext = nextTier ? Math.max(0, nextTier.min - (balance || 0)) : 0;
+
   return (
     <>
       <Head
         title={`Good morning, ${displayName}`}
         copy="Your progress is building something meaningful."
       />
-      <Card className="overflow-hidden border-orange-100 bg-gradient-to-br from-orange-600 via-orange-500 to-amber-500 p-6 text-white shadow-[0_18px_45px_rgba(234,88,12,.18)] sm:p-9">
-        <div className="flex items-center gap-3 border-b border-white/15 pb-6">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/15 text-sm font-bold tracking-wide">
-            {batch.initials}
-          </span>
-          <div>
-            <p className="font-semibold">{batch.name}</p>
-            <p className="text-sm text-orange-100">{batch.year}</p>
+
+      {/* INNOVATIVE TOP-LOCATION AURA BALANCE SHOWCASE */}
+      <div className="relative mb-8 overflow-hidden rounded-3xl border border-amber-200/80 bg-gradient-to-br from-amber-500 via-orange-600 to-amber-700 p-6 text-white shadow-[0_20px_50px_rgba(234,88,12,0.28)] sm:p-9">
+        {/* Dynamic ambient glowing aura backgrounds */}
+        <div className="pointer-events-none absolute -left-12 -top-12 h-64 w-64 rounded-full bg-amber-300/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -right-16 h-72 w-72 rounded-full bg-orange-400/30 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.18),transparent_65%)]" />
+
+        {/* Top Header inside balance card: Batch & Live Status */}
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/20 pb-5">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 text-sm font-black tracking-wider text-white shadow-inner backdrop-blur-md">
+              {batch.initials}
+            </span>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-200">
+                AURA NEXUS · {batch.name}
+              </p>
+              <p className="text-sm font-semibold text-white/90">{batch.year} Performance Hub</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-bold backdrop-blur-md">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              LIVE ENERGY SYNC
+            </span>
+            <span className="hidden sm:inline-flex rounded-full border border-white/20 bg-amber-400/20 px-3 py-1 text-xs font-semibold">
+              ⚡ 1.25x Streak Surge
+            </span>
           </div>
         </div>
-        <div className="mt-9 grid gap-8 lg:grid-cols-[1.1fr_.9fr] lg:items-end">
+
+        {/* Main Balance Hero & Gamified Power Tier */}
+        <div className="relative z-10 mt-7 grid gap-8 lg:grid-cols-[1.2fr_.8fr] lg:items-center">
           <div>
-            <p className="text-xs font-bold tracking-[.18em] text-orange-100">TOTAL AURA</p>
-            <p className="mt-3 text-5xl font-bold tracking-tight sm:text-7xl">
-              ✨ {(balance || 0).toLocaleString()}{" "}
-              <span className="text-2xl font-medium sm:text-3xl">Aura</span>
-            </p>
-            <p className="mt-4 inline-flex rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold">
-              Available Balance
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur-sm">
-            <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-xl text-orange-600">
-                <Trophy className="h-6 w-6" />
+            <div className="flex items-center gap-2">
+              <span className="inline-block text-xs font-extrabold uppercase tracking-[0.2em] text-amber-200">
+                AVAILABLE AURA BALANCE
               </span>
-              <div>
-                <p className="text-xs font-bold tracking-wide text-orange-100">CURRENT BADGE</p>
-                <p className="text-xl font-bold">AI Champion</p>
+              <span className="rounded-full bg-amber-400/30 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                Level {currentTier.level}
+              </span>
+            </div>
+
+            {/* Eye-catching glowing number display */}
+            <div className="mt-3 flex items-baseline gap-3">
+              <span className="text-6xl font-black tracking-tight text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.25)] sm:text-7xl lg:text-8xl">
+                ✨ {(balance || 0).toLocaleString()}
+              </span>
+              <div className="flex flex-col">
+                <span className="text-2xl font-black tracking-wide text-amber-200 sm:text-3xl">AURA</span>
+                <span className="text-xs font-semibold text-white/80">Ready to redeem or award</span>
               </div>
             </div>
-            <div className="mt-6 flex justify-between text-sm">
-              <span>{(balance || 0).toLocaleString()} / 15,000 Aura</span>
-              <span>{Math.min(100, (balance || 0) / 150).toFixed(0)}%</span>
+
+            {/* Innovative Action Pills directly in Balance Hero */}
+            <div className="mt-6 flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={() => go("tasks")}
+                className="group flex items-center gap-1.5 rounded-xl border border-white/30 bg-white px-3.5 py-2 text-xs font-bold text-orange-700 shadow-md transition hover:scale-105 hover:bg-amber-50"
+              >
+                <Target className="h-4 w-4 text-orange-600 transition group-hover:rotate-12" />
+                Earn Aura Tasks
+              </button>
+              <button
+                onClick={() => go("store")}
+                className="group flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/15 px-3.5 py-2 text-xs font-bold text-white shadow-sm backdrop-blur-md transition hover:scale-105 hover:bg-white/25"
+              >
+                <Gift className="h-4 w-4 text-amber-200 transition group-hover:rotate-12" />
+                Redeem Rewards
+              </button>
+              <button
+                onClick={() => go("history")}
+                className="flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-3.5 py-2 text-xs font-bold text-white/90 backdrop-blur-md transition hover:scale-105 hover:bg-white/20"
+              >
+                <ReceiptText className="h-4 w-4 text-amber-200" />
+                Aura Ledger
+              </button>
             </div>
-            <div className="mt-2 h-3 rounded-full bg-white/20">
-              <div
-                className="h-3 rounded-full bg-white shadow-sm"
-                style={{ width: `${Math.min(100, (balance || 0) / 150)}%` }}
-              />
+          </div>
+
+          {/* Gamified Tier Card with Holographic Aura Core */}
+          <div className="relative rounded-2xl border border-white/25 bg-white/15 p-5 shadow-inner backdrop-blur-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-2xl text-orange-600 shadow-md">
+                  <Trophy className="h-6 w-6 text-amber-500" />
+                </span>
+                <div>
+                  <p className="text-[11px] font-bold tracking-wider text-amber-200 uppercase">
+                    CURRENT TIER
+                  </p>
+                  <p className="text-lg font-black text-white">{currentTier.name}</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-white/20 px-2.5 py-1 text-xs font-extrabold text-white">
+                {progressPercent}%
+              </span>
             </div>
-            <p className="mt-3 text-sm text-orange-100">
-              {Math.max(0, 15000 - (balance || 0)).toLocaleString()} Aura to next badge
-            </p>
+
+            {/* Glowing Progress Bar */}
+            <div className="mt-5">
+              <div className="flex justify-between text-xs font-medium text-amber-100">
+                <span>{(balance || 0).toLocaleString()} Aura</span>
+                <span>{nextTier ? `${nextTier.min.toLocaleString()} Aura` : "Max Tier"}</span>
+              </div>
+              <div className="mt-2 h-3.5 w-full overflow-hidden rounded-full bg-black/20 p-0.5">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-300 to-white shadow-[0_0_12px_rgba(255,255,255,0.7)] transition-all duration-700"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <p className="mt-2.5 text-xs text-amber-100/90 font-medium">
+                {nextTier
+                  ? `⚡ Only ${auraToNext.toLocaleString()} Aura needed to unlock ${nextTier.name}!`
+                  : "🌟 Maximum Tier reached! You are an Aura Luminary."}
+              </p>
+            </div>
           </div>
         </div>
-      </Card>
+      </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_.8fr]">
         <div className="space-y-6">
           <TaskList open={open} initialTasks={initialTasks} />
@@ -1088,30 +1196,65 @@ function AdminHome({
 // Safely handles both Assignment objects (a.task.title) and Task objects (a.title)
 function TaskList({ open, initialTasks }: { open: (t: any) => void; initialTasks?: any[] }) {
   return (
-    <Card className="p-5">
-      <b>Your tasks</b>
+    <Card className="overflow-hidden p-5">
+      <div className="flex items-center justify-between mb-4 border-b border-zinc-100 pb-3">
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-orange-600" />
+          <b className="text-zinc-900">Your Assigned Tasks</b>
+        </div>
+        <span className="text-xs font-semibold text-zinc-400">Tabular Summary</span>
+      </div>
       {!initialTasks || initialTasks.length === 0 ? (
-        <div className="py-8 text-center text-zinc-500">No tasks assigned yet.</div>
+        <div className="py-8 text-center text-zinc-400">No tasks assigned yet.</div>
       ) : (
-        initialTasks.slice(0, 5).map((a: any) => {
-          const theTask = a.task || a;
-          return (
-            <button
-              onClick={() => open(a)}
-              key={a.id}
-              className="mt-4 flex w-full items-center gap-3 text-left transition hover:bg-orange-50/50 p-2 rounded-xl"
-            >
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-orange-50">
-                <Target className="h-4 w-4 text-orange-600" />
-              </span>
-              <span className="flex-1">
-                <b className="block text-sm">{theTask?.title || "Untitled Task"}</b>
-                <small className="text-zinc-500">{theTask?.baseAura || 0} Aura</small>
-              </span>
-              <Pill>{a.status || "ASSIGNED"}</Pill>
-            </button>
-          );
-        })
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-zinc-100 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                <th className="pb-2.5">Task Title</th>
+                <th className="pb-2.5">Reward</th>
+                <th className="pb-2.5">Status</th>
+                <th className="pb-2.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-50">
+              {initialTasks.slice(0, 5).map((a: any) => {
+                const theTask = a.task || a;
+                return (
+                  <tr
+                    onClick={() => open(a)}
+                    key={a.id}
+                    className="group cursor-pointer transition hover:bg-orange-50/50"
+                  >
+                    <td className="py-3 pr-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-600 transition group-hover:bg-orange-600 group-hover:text-white">
+                          <Target className="h-3.5 w-3.5" />
+                        </span>
+                        <b className="block text-xs sm:text-sm font-semibold text-zinc-900 group-hover:text-orange-600 transition-colors">
+                          {theTask?.title || "Untitled Task"}
+                        </b>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-700">
+                        ✨ +{theTask?.baseAura || 0}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3">
+                      <Pill>{a.status || "ASSIGNED"}</Pill>
+                    </td>
+                    <td className="whitespace-nowrap py-3 text-right">
+                      <span className="inline-flex items-center gap-0.5 text-xs font-bold text-orange-600 group-hover:translate-x-0.5 transition-transform">
+                        Open <ChevronRight className="h-3.5 w-3.5" />
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </Card>
   );
@@ -1130,7 +1273,7 @@ function Feed() {
               ? "completed Product story mapping"
               : i === 1
               ? "unlocked the Comet badge"
-              : "gave Kudos to Kabir"}
+              : "reacted with 🔥 Crushing It to Kabir"}
             <small className="block text-zinc-400">2 hours ago</small>
           </p>
         </div>
@@ -1179,6 +1322,9 @@ function Tasks({
   };
 
   const [filter, setFilter] = useState("All tasks");
+  const [taskSearch, setTaskSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+
   const filters = [
     "All tasks",
     "In Progress",
@@ -1204,73 +1350,233 @@ function Tasks({
         assignmentId: a.id,
       }));
 
-  const filtered =
-    filter === "All tasks"
-      ? displayItems
-      : displayItems.filter(
-          (item) => (STATUS_FILTER_MAP[item.assignmentStatus] || item.assignmentStatus) === filter
-        );
+  const filtered = displayItems.filter((item) => {
+    const matchesFilter =
+      filter === "All tasks" ||
+      (STATUS_FILTER_MAP[item.assignmentStatus] || item.assignmentStatus) === filter;
+    const matchesSearch =
+      taskSearch.trim() === "" ||
+      item.task?.title?.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      item.task?.description?.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      item.task?.createdBy?.name?.toLowerCase().includes(taskSearch.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
 
   return (
     <>
       <Head
         title={admin ? "Task workspace" : "Tasks that move things forward"}
-        copy="Tasks, filters, details, and review states."
+        copy="Structured assignments, reviews, and high-impact momentum."
         action={
-          admin ? (
-            <Button onClick={openCreateTask}>
-              <Plus className="mr-2 h-4 w-4" />
-              New task
-            </Button>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {admin && (
+              <Button onClick={openCreateTask}>
+                <Plus className="mr-2 h-4 w-4" />
+                New task
+              </Button>
+            )}
+          </div>
         }
       />
-      <div className="mb-5 flex gap-2 overflow-auto">
-        {filters.map((x) => (
-          <button
-            key={x}
-            onClick={() => setFilter(x)}
-            className={cn(
-              "whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition",
-              filter === x ? "bg-zinc-900 text-white" : "bg-white ring-1 ring-zinc-200"
-            )}
-          >
-            {x}
-          </button>
-        ))}
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {filtered.length === 0 ? (
-          <div className="col-span-2 p-8 text-center text-zinc-500">No tasks for this filter.</div>
-        ) : (
-          filtered.map((item, idx) => (
-            <Card className="p-5" key={(item.assignmentId || item.task.id) + idx}>
-              <div className="flex justify-between">
-                <Pill>{STATUS_FILTER_MAP[item.assignmentStatus] || item.assignmentStatus}</Pill>
-                <b className="text-orange-600">{item.task.baseAura} Aura</b>
-              </div>
-              <h3 className="mt-4 text-lg font-bold">{item.task.title}</h3>
-              <p className="mt-2 text-sm text-zinc-500">{item.task.description}</p>
-              <div className="mt-5 flex justify-between border-t pt-4 text-xs text-zinc-500">
-                <span className="text-zinc-400">
-                  {item.task.createdBy?.name ? `By ${item.task.createdBy.name}` : ""}
-                </span>
-                <button
-                  onClick={() =>
-                    open(
-                      admin
-                        ? item.task
-                        : (initialTasks || []).find((a: any) => a.id === item.assignmentId) || item.task
-                    )
-                  }
-                  className="font-bold text-orange-600"
+
+      {/* Filter Chips & Search Bar */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+          {filters.map((x) => {
+            const count =
+              x === "All tasks"
+                ? displayItems.length
+                : displayItems.filter(
+                    (item) => (STATUS_FILTER_MAP[item.assignmentStatus] || item.assignmentStatus) === x
+                  ).length;
+            const active = filter === x;
+            return (
+              <button
+                key={x}
+                onClick={() => setFilter(x)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition",
+                  active
+                    ? "bg-zinc-900 text-white shadow-sm"
+                    : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50"
+                )}
+              >
+                <span>{x}</span>
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.2 text-[10px] font-bold",
+                    active ? "bg-white/20 text-white" : "bg-zinc-100 text-zinc-500"
+                  )}
                 >
-                  View task <ChevronRight className="inline h-4 w-4" />
-                </button>
-              </div>
-            </Card>
-          ))
-        )}
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Quick Search in Table */}
+        <div className="relative w-full sm:w-64">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="text"
+            value={taskSearch}
+            onChange={(e) => setTaskSearch(e.target.value)}
+            placeholder="Search tasks..."
+            className="w-full rounded-full border border-zinc-200 bg-white py-1.5 pl-8 pr-3 text-xs text-zinc-800 placeholder-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+          />
+          {taskSearch && (
+            <button
+              onClick={() => setTaskSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ATTRACTIVE TABULAR TASKS DISPLAY */}
+      <div className="overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-[0_8px_30px_rgba(234,88,12,0.06)]">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-orange-100/80 bg-gradient-to-r from-orange-50/70 via-amber-50/40 to-white text-[11px] sm:text-xs font-bold uppercase tracking-wider text-zinc-600">
+                <th className="px-5 py-4">Task & Details</th>
+                <th className="px-5 py-4">Aura Reward</th>
+                <th className="px-5 py-4">Status</th>
+                <th className="px-5 py-4">Assigned By</th>
+                <th className="px-5 py-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-16 text-center">
+                    <Target className="mx-auto mb-3 h-10 w-10 text-orange-200" />
+                    <p className="font-bold text-zinc-800">No tasks found</p>
+                    <p className="mt-1 text-xs text-zinc-400">
+                      {taskSearch
+                        ? `No tasks matching "${taskSearch}".`
+                        : "No tasks found under this filter."}
+                    </p>
+                    {(filter !== "All tasks" || taskSearch) && (
+                      <button
+                        onClick={() => {
+                          setFilter("All tasks");
+                          setTaskSearch("");
+                        }}
+                        className="mt-3 text-xs font-bold text-orange-600 hover:underline"
+                      >
+                        Reset filters
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((item, idx) => {
+                  const statusLabel = STATUS_FILTER_MAP[item.assignmentStatus] || item.assignmentStatus;
+                  const isCompleted = item.assignmentStatus === "COMPLETED";
+                  const isInProgress = item.assignmentStatus === "IN_PROGRESS";
+                  const isSubmitted = item.assignmentStatus === "SUBMITTED";
+                  const isNeedsChanges = item.assignmentStatus === "NEEDS_CHANGES";
+
+                  return (
+                    <tr
+                      key={(item.assignmentId || item.task.id) + idx}
+                      onClick={() =>
+                        open(
+                          admin
+                            ? item.task
+                            : (initialTasks || []).find((a: any) => a.id === item.assignmentId) || item.task
+                        )
+                      }
+                      className="group cursor-pointer transition hover:bg-orange-50/50"
+                    >
+                      {/* Column 1: Task Title & Description */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-start gap-3.5">
+                          <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-orange-100/70 text-orange-600 shadow-sm transition group-hover:scale-105 group-hover:bg-orange-600 group-hover:text-white">
+                            <Target className="h-5 w-5" />
+                          </span>
+                          <div className="max-w-md">
+                            <b className="block text-sm font-bold text-zinc-900 group-hover:text-orange-600 transition-colors">
+                              {item.task.title}
+                            </b>
+                            {item.task.description && (
+                              <p className="mt-1 line-clamp-1 text-xs text-zinc-500">
+                                {item.task.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Column 2: Aura Reward */}
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200/80 bg-gradient-to-r from-orange-50 to-amber-50 px-3.5 py-1 text-xs font-black text-orange-700 shadow-xs">
+                          <span>✨</span>
+                          <span>+{item.task.baseAura} Aura</span>
+                        </span>
+                      </td>
+
+                      {/* Column 3: Status with distinctive pill */}
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold",
+                            isCompleted && "bg-emerald-100 text-emerald-800",
+                            isInProgress && "bg-amber-100 text-amber-800",
+                            isSubmitted && "bg-purple-100 text-purple-800",
+                            isNeedsChanges && "bg-rose-100 text-rose-800",
+                            !isCompleted && !isInProgress && !isSubmitted && !isNeedsChanges && "bg-zinc-100 text-zinc-700"
+                          )}
+                        >
+                          {isInProgress && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />}
+                          {isCompleted && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
+                          {isSubmitted && <Clock3 className="h-3.5 w-3.5 text-purple-600" />}
+                          {isNeedsChanges && <AlertCircle className="h-3.5 w-3.5 text-rose-600" />}
+                          {statusLabel}
+                        </span>
+                      </td>
+
+                      {/* Column 4: Creator / Assignor */}
+                      <td className="whitespace-nowrap px-5 py-4 text-xs text-zinc-500">
+                        {item.task.createdBy?.name ? (
+                          <div className="flex items-center gap-2">
+                            <span className="grid h-6 w-6 place-items-center rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-700">
+                              {item.task.createdBy.name[0].toUpperCase()}
+                            </span>
+                            <span className="font-medium text-zinc-700">{item.task.createdBy.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-zinc-400">Team Admin</span>
+                        )}
+                      </td>
+
+                      {/* Column 5: Action */}
+                      <td className="whitespace-nowrap px-5 py-4 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            open(
+                              admin
+                                ? item.task
+                                : (initialTasks || []).find((a: any) => a.id === item.assignmentId) || item.task
+                            );
+                          }}
+                          className="inline-flex items-center gap-1 rounded-xl bg-orange-50 px-3.5 py-1.5 text-xs font-bold text-orange-700 transition group-hover:bg-orange-600 group-hover:text-white group-hover:shadow-sm"
+                        >
+                          View Task <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </>
   );
@@ -1436,52 +1742,155 @@ function TaskModal({
 
 function Leaderboard() {
   const top = members.slice(0, 3);
+  // top[0] is 1st Place, top[1] is 2nd Place, top[2] is 3rd Place
+
   return (
     <>
       <Head
-        title="September leaderboard"
+        title="September Leaderboard"
         copy="A monthly celebration of the work that moved the team forward."
       />
-      <div className="mb-8 grid items-end gap-3 sm:grid-cols-3">
-        {[1, 0, 2].map((index, position) => {
-          const heights = ["sm:mt-10", "", "sm:mt-16"];
-          const medals = ["🥈", "🥇", "🥉"];
-          return (
-            <Card className={cn("p-5 text-center", heights[position])} key={top[index]}>
-              <span className="text-3xl">{medals[position]}</span>
-              <Avatar name={top[index]} />
-              <b className="mt-3 block">{top[index]}</b>
-              <small className="block text-zinc-500">
-                {index === 0 ? "AI Champion" : "Aurora"} badge
-              </small>
-              <p className="mt-3 text-xl font-bold text-orange-600">{12 - index * 2},000 Aura</p>
-              <span className="mt-2 inline-block rounded-full bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700">
-                {index + 1}
-                {index === 0 ? "st" : index === 1 ? "nd" : "rd"} place
+
+      {/* 3-STEP SCHOOL SPORTS PODIUM */}
+      <div className="relative mb-10 overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-b from-amber-50/70 via-white to-orange-50/40 p-6 sm:p-10 shadow-[0_12px_40px_rgba(234,88,12,0.08)]">
+        {/* Podium Title Banner */}
+        <div className="text-center mb-6">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3.5 py-1 text-xs font-black tracking-wider text-orange-800 uppercase">
+            <Trophy className="h-3.5 w-3.5 text-orange-600" />
+            School Honors Podium
+          </span>
+          <h2 className="mt-2 text-2xl font-black text-zinc-900 sm:text-3xl">Top 3 Aura Champions</h2>
+          <p className="mt-1 text-xs sm:text-sm text-zinc-500">
+            Standing on the victory stairs for outstanding monthly contributions
+          </p>
+        </div>
+
+        {/* The 3 Podium Stairs (Left: 2nd, Center: 1st, Right: 3rd) */}
+        <div className="mx-auto flex max-w-xl items-end justify-center gap-2 sm:gap-4 pt-10">
+          {/* STEP 2: 2ND PLACE (SILVER) - Left Stair */}
+          <div className="flex w-1/3 flex-col items-center">
+            {/* Perched on top of step 2 */}
+            <div className="mb-3 flex flex-col items-center text-center">
+              <span className="text-2xl sm:text-3xl mb-1 drop-shadow-sm">🥈</span>
+              <div className="relative">
+                <span className="grid h-14 w-14 sm:h-16 sm:w-16 place-items-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 text-base font-bold text-slate-800 shadow-md ring-4 ring-slate-300">
+                  {top[1]?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "S2"}
+                </span>
+                <span className="absolute -bottom-1.5 -right-1.5 rounded-full bg-slate-600 px-1.5 py-0.5 text-[9px] font-black text-white shadow">
+                  #2
+                </span>
+              </div>
+              <b className="mt-2 block max-w-[110px] truncate text-xs sm:text-sm font-bold text-zinc-900">
+                {top[1] || "Silver Star"}
+              </b>
+              <span className="text-[10px] text-zinc-400 font-medium">Aurora badge</span>
+              <p className="mt-1 text-xs sm:text-sm font-black text-slate-700">10,000 Aura</p>
+            </div>
+
+            {/* Physical Stair Step 2 Block */}
+            <div className="relative flex h-44 sm:h-52 w-full flex-col items-center justify-between rounded-t-2xl border-t-4 border-slate-200 bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500 p-3 shadow-lg transition-transform hover:-translate-y-1">
+              <span className="rounded-full bg-white/40 px-2.5 py-0.5 text-[9px] sm:text-[10px] font-black tracking-widest text-slate-800 uppercase shadow-xs">
+                2nd Place
               </span>
-            </Card>
-          );
-        })}
+              <span className="my-auto text-6xl sm:text-7xl font-black text-white/50 tracking-tighter drop-shadow-sm select-none">
+                2
+              </span>
+              <span className="text-[9px] sm:text-[10px] font-bold text-slate-900/80 tracking-wider">SILVER STEP</span>
+            </div>
+          </div>
+
+          {/* STEP 1: 1ST PLACE (GOLD CHAMPION) - Center Stair (Elevated Highest) */}
+          <div className="flex w-1/3 flex-col items-center">
+            {/* Perched on top of step 1 */}
+            <div className="mb-3 flex flex-col items-center text-center">
+              <div className="relative -mb-1 animate-bounce text-3xl sm:text-4xl">👑</div>
+              <div className="relative">
+                <span className="grid h-16 w-16 sm:h-20 sm:w-20 place-items-center rounded-2xl bg-gradient-to-br from-amber-200 to-amber-400 text-lg sm:text-xl font-black text-amber-950 shadow-xl ring-4 ring-amber-400 ring-offset-2 ring-offset-amber-50">
+                  {top[0]?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "G1"}
+                </span>
+                <span className="absolute -bottom-2 -right-1.5 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white shadow">
+                  #1
+                </span>
+              </div>
+              <b className="mt-2 block max-w-[120px] truncate text-sm sm:text-base font-extrabold text-zinc-900">
+                {top[0] || "Gold Champion"}
+              </b>
+              <span className="text-[11px] font-semibold text-amber-600">AI Champion</span>
+              <p className="mt-1 text-sm sm:text-base font-black text-orange-600">12,000 Aura</p>
+            </div>
+
+            {/* Physical Stair Step 1 Block (Tallest Podium Riser) */}
+            <div className="relative flex h-56 sm:h-68 w-full flex-col items-center justify-between rounded-t-2xl border-t-4 border-amber-200 bg-gradient-to-b from-amber-400 via-amber-500 to-orange-600 p-3 shadow-xl ring-2 ring-amber-300/60 transition-transform hover:-translate-y-1">
+              <span className="rounded-full bg-amber-950/25 px-3 py-0.5 text-[9px] sm:text-[10px] font-black tracking-widest text-white uppercase shadow-xs">
+                🥇 Champion
+              </span>
+              <span className="my-auto text-7xl sm:text-8xl font-black text-white/60 tracking-tighter drop-shadow-md select-none">
+                1
+              </span>
+              <span className="text-[9px] sm:text-[10px] font-extrabold text-amber-100 tracking-wider">GOLD STEP</span>
+            </div>
+          </div>
+
+          {/* STEP 3: 3RD PLACE (BRONZE) - Right Stair (Lowest Step) */}
+          <div className="flex w-1/3 flex-col items-center">
+            {/* Perched on top of step 3 */}
+            <div className="mb-3 flex flex-col items-center text-center">
+              <span className="text-2xl sm:text-3xl mb-1 drop-shadow-sm">🥉</span>
+              <div className="relative">
+                <span className="grid h-14 w-14 sm:h-16 sm:w-16 place-items-center rounded-2xl bg-gradient-to-br from-amber-600 to-amber-800 text-base font-bold text-amber-100 shadow-md ring-4 ring-amber-700/60">
+                  {top[2]?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "B3"}
+                </span>
+                <span className="absolute -bottom-1.5 -right-1.5 rounded-full bg-amber-800 px-1.5 py-0.5 text-[9px] font-black text-white shadow">
+                  #3
+                </span>
+              </div>
+              <b className="mt-2 block max-w-[110px] truncate text-xs sm:text-sm font-bold text-zinc-900">
+                {top[2] || "Bronze Victor"}
+              </b>
+              <span className="text-[10px] text-zinc-400 font-medium">Spark badge</span>
+              <p className="mt-1 text-xs sm:text-sm font-black text-amber-800">8,000 Aura</p>
+            </div>
+
+            {/* Physical Stair Step 3 Block */}
+            <div className="relative flex h-36 sm:h-44 w-full flex-col items-center justify-between rounded-t-2xl border-t-4 border-amber-500 bg-gradient-to-b from-amber-600 via-amber-700 to-amber-800 p-3 shadow-lg transition-transform hover:-translate-y-1">
+              <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[9px] sm:text-[10px] font-black tracking-widest text-amber-100 uppercase shadow-xs">
+                3rd Place
+              </span>
+              <span className="my-auto text-5xl sm:text-6xl font-black text-white/40 tracking-tighter drop-shadow-sm select-none">
+                3
+              </span>
+              <span className="text-[9px] sm:text-[10px] font-bold text-amber-200/80 tracking-wider">BRONZE STEP</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Unified Podium Foundation Ground Bar */}
+        <div className="mx-auto max-w-xl h-5 rounded-b-xl border-t-2 border-zinc-700 bg-gradient-to-r from-zinc-800 via-zinc-900 to-zinc-800 shadow-xl" />
       </div>
-      <Card>
+
+      {/* Ranks 4 to 15 */}
+      <Card className="overflow-hidden">
+        <div className="border-b border-zinc-100 bg-zinc-50/50 px-5 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">
+          All Participants & Standings
+        </div>
         {members.slice(3, 15).map((m, i) => {
           const rank = i + 4;
           const own = m === "Aarav Sharma";
           return (
             <div
-              className={cn("flex items-center gap-3 border-b p-4 last:border-0", own && "bg-orange-50/70")}
+              className={cn("flex items-center gap-3 border-b p-4 last:border-0 transition hover:bg-orange-50/40", own && "bg-orange-50/70")}
               key={m}
             >
-              <b className="w-6 text-center text-zinc-400">{rank}</b>
+              <b className="w-6 text-center text-sm font-bold text-zinc-400">{rank}</b>
               <Avatar name={m} />
               <span className="flex-1">
-                <b className="text-sm">
+                <b className="text-sm font-semibold text-zinc-900">
                   {m}
-                  {own && <span className="ml-2 text-xs text-orange-600">You</span>}
+                  {own && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">You</span>}
                 </b>
-                <small className="block text-zinc-500">Spark badge</small>
+                <small className="block text-xs text-zinc-500">Spark badge</small>
               </span>
-              <b className="text-orange-600">{10 - i}000 Aura</b>
+              <b className="text-sm font-bold text-orange-600">{10 - i}000 Aura</b>
             </div>
           );
         })}
@@ -1501,16 +1910,31 @@ function Wall({
   openSendKudos: () => void;
 }) {
   const items = kudos && kudos.length > 0 ? kudos : [];
+  const [reactions, setReactions] = useState<Record<string, Record<string, number>>>({});
+
+  const handleWallReact = (id: string, emoji: string) => {
+    setReactions((prev) => {
+      const cur = prev[id] || {};
+      return {
+        ...prev,
+        [id]: {
+          ...cur,
+          [emoji]: (cur[emoji] || 0) + 1,
+        },
+      };
+    });
+    notify(`Reacted with ${emoji}!`);
+  };
 
   return (
     <div>
       <Head
         title="Aura Wall"
-        copy="Moments of momentum and peer recognition, pinned for the whole team."
+        copy="Peer recognition and energetic reactions pinned for the entire team."
         action={
-          <Button onClick={openSendKudos}>
+          <Button onClick={openSendKudos} className="bg-orange-600 hover:bg-orange-700 font-bold shadow-md">
             <Sparkles className="mr-2 h-4 w-4" />
-            Send Kudos
+            React with Kudos
           </Button>
         }
       />
@@ -1526,10 +1950,10 @@ function Wall({
             <Sparkles className="h-12 w-12 text-orange-400 mb-3" />
             <b className="text-lg">No Kudos pinned yet</b>
             <p className="mt-1 text-sm text-zinc-500 max-w-sm">
-              Be the first to recognize a colleague's great work and pin a moment to the Aura Wall!
+              Be the first to react and celebrate a teammate on the Aura Wall!
             </p>
-            <Button onClick={openSendKudos} className="mt-5">
-              Send the first Kudos
+            <Button onClick={openSendKudos} className="mt-5 bg-orange-600 hover:bg-orange-700">
+              React with Kudos
             </Button>
           </div>
         ) : (
@@ -1537,39 +1961,91 @@ function Wall({
             {items.map((k, i) => {
               const senderName = k.sender?.name || "Teammate";
               const receiverName = k.receiver?.name || "Colleague";
+              const noteText = k.message || "";
+              
+              // Check if message is a reaction (e.g., "🔥 Crushing It" or contains emoji)
+              const emojiMatch = noteText.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic}|\S+)\s*(.*)$/u);
+              const hasReactionFormat = emojiMatch && emojiMatch[1] && emojiMatch[2];
+              const reactionEmoji = hasReactionFormat ? emojiMatch[1] : (i % 3 === 0 ? "🔥" : i % 3 === 1 ? "🚀" : "🙌");
+              const reactionLabel = hasReactionFormat ? emojiMatch[2] : noteText;
+
+              const cardId = k.id || `kudo-${i}`;
+              const curReactions = reactions[cardId] || {};
+
               return (
                 <article
-                  key={k.id || i}
+                  key={cardId}
                   className={cn(
-                    "rounded-sm p-5 shadow-[3px_5px_14px_rgba(120,70,20,.14)] transition duration-300 hover:-translate-y-1 hover:rotate-0 flex flex-col justify-between",
+                    "rounded-2xl p-5 shadow-[3px_6px_18px_rgba(120,70,20,.14)] transition duration-300 hover:-translate-y-1.5 hover:rotate-0 flex flex-col justify-between border border-black/5",
                     i % 5 === 0
-                      ? "-rotate-1 bg-[#fff1ba]"
+                      ? "-rotate-1 bg-[#fff2be]"
                       : i % 5 === 1
-                      ? "rotate-1 bg-[#ffd9bd]"
+                      ? "rotate-1 bg-[#ffddc4]"
                       : i % 5 === 2
-                      ? "-rotate-2 bg-[#dcefd6]"
+                      ? "-rotate-2 bg-[#dff0d8]"
                       : i % 5 === 3
-                      ? "rotate-2 bg-[#f5ddeb]"
-                      : "-rotate-1 bg-[#dcecf0]"
+                      ? "rotate-2 bg-[#f8e0ee]"
+                      : "-rotate-1 bg-[#deedf2]"
                   )}
                 >
                   <div>
+                    {/* Card Top: Sender Avatar & Wall Pin */}
                     <div className="flex items-start justify-between">
                       <Avatar name={senderName} />
-                      <span className="text-lg">
-                        {i % 3 === 0 ? "✦" : i % 3 === 1 ? "🏅" : "♥"}
+                      <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-black shadow-xs">
+                        KUDOS
                       </span>
                     </div>
-                    <p className="mt-4 text-xs font-bold uppercase tracking-wider text-zinc-500">
-                      {senderName} → <span className="text-zinc-900">{receiverName}</span>
+
+                    {/* Sender -> Receiver Tag */}
+                    <p className="mt-4 text-xs font-bold uppercase tracking-wider text-zinc-600">
+                      {senderName} → <span className="text-zinc-950 font-black">{receiverName}</span>
                     </p>
-                    <p className="mt-3 text-sm leading-6 font-medium text-zinc-800">
-                      "{k.message}"
-                    </p>
+
+                    {/* REACTION SHOWCASE IN SPOTLIGHT */}
+                    <div className="mt-4 mb-2 flex flex-col items-center justify-center rounded-xl bg-white/50 p-4 text-center backdrop-blur-xs border border-white/60 shadow-xs">
+                      <span className="text-4xl sm:text-5xl animate-pulse">{reactionEmoji}</span>
+                      <b className="mt-2 text-sm sm:text-base font-extrabold text-zinc-900 tracking-tight">
+                        {reactionLabel}
+                      </b>
+                      <span className="mt-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+                        Peer Kudos Reaction
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-black/5 flex items-center justify-between text-xs text-zinc-500">
-                    <span>{new Date(k.createdAt || Date.now()).toLocaleDateString()}</span>
-                    <span className="font-bold text-orange-700">+10 Aura</span>
+
+                  <div>
+                    {/* Interactive Wall Reaction Bar */}
+                    <div className="mt-3 flex items-center gap-1.5 pt-2 border-t border-black/5">
+                      {[
+                        { emoji: "🔥", base: 2 },
+                        { emoji: "🚀", base: 1 },
+                        { emoji: "❤️", base: 4 },
+                        { emoji: "👏", base: 3 },
+                      ].map((r) => {
+                        const count = r.base + (curReactions[r.emoji] || 0);
+                        return (
+                          <button
+                            key={r.emoji}
+                            type="button"
+                            onClick={() => handleWallReact(cardId, r.emoji)}
+                            className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-zinc-700 transition hover:scale-110 hover:bg-white active:scale-95 shadow-2xs"
+                            title={`React with ${r.emoji}`}
+                          >
+                            <span>{r.emoji}</span>
+                            <span className="text-[10px] text-zinc-500">{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Footer: Date and +10 Aura reward */}
+                    <div className="mt-3 pt-2 border-t border-black/5 flex items-center justify-between text-xs text-zinc-500">
+                      <span className="text-[11px] font-medium">{new Date(k.createdAt || Date.now()).toLocaleDateString()}</span>
+                      <span className="font-extrabold text-orange-800 bg-orange-100/80 px-2 py-0.5 rounded-full text-[11px]">
+                        +10 Aura
+                      </span>
+                    </div>
                   </div>
                 </article>
               );
@@ -2407,7 +2883,20 @@ function AddProductModal({
   );
 }
 
-// Send Kudos Modal
+const KUDOS_REACTION_OPTIONS = [
+  { id: "fire", emoji: "🔥", label: "Crushing It", desc: "Unstoppable momentum & energy" },
+  { id: "rocket", emoji: "🚀", label: "Game Changer", desc: "Shipped big-impact results" },
+  { id: "brain", emoji: "💡", label: "Big Brain", desc: "Brilliant solution & insight" },
+  { id: "mvp", emoji: "🙌", label: "Team MVP", desc: "Incredible teamwork & support" },
+  { id: "gem", emoji: "💎", label: "Pure Quality", desc: "Flawless craft & attention to detail" },
+  { id: "lightning", emoji: "⚡", label: "Lightning Speed", desc: "Fast velocity & quick turnaround" },
+  { id: "target", emoji: "🎯", label: "Bullseye", desc: "Hit the team objective dead-on" },
+  { id: "star", emoji: "🌟", label: "Superstar", desc: "Radiant positive vibes & leadership" },
+  { id: "heart", emoji: "❤️", label: "Heart & Soul", desc: "Uplifting and kind teammate" },
+  { id: "clap", emoji: "👏", label: "Standing Ovation", desc: "Major milestone celebration" },
+];
+
+// Send Kudos Reaction Modal (Reactions only, no text message)
 function SendKudosModal({
   close,
   notify,
@@ -2420,63 +2909,117 @@ function SendKudosModal({
   users: any[];
 }) {
   const [loading, setLoading] = useState(false);
+  const [selectedReaction, setSelectedReaction] = useState(KUDOS_REACTION_OPTIONS[0]);
+
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
+    // Explicitly set the chosen reaction as message for backend compatibility
+    fd.set("message", `${selectedReaction.emoji} ${selectedReaction.label}`);
     const res = await sendKudosAction(fd);
     if (res.success) {
-      notify("Kudos sent! +10 Aura recognized.");
+      notify(`Kudos reaction sent! +10 Aura awarded to teammate.`);
       onSuccess();
     } else {
-      notify((res as any).error || "Failed to send Kudos");
+      notify((res as any).error || "Failed to send Kudos reaction");
       setLoading(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-zinc-900/30 p-4">
-      <Card className="w-full max-w-md p-6">
-        <div className="flex justify-between mb-4">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-orange-600" />
-            Send Team Kudos
-          </h3>
-          <button onClick={close}>
+    <div className="fixed inset-0 z-30 grid place-items-center bg-zinc-900/40 p-4 backdrop-blur-xs">
+      <Card className="w-full max-w-lg p-6 shadow-2xl">
+        <div className="flex justify-between mb-4 border-b border-zinc-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-orange-100 text-orange-600">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="text-lg font-bold text-zinc-900">React with Kudos</h3>
+              <p className="text-xs text-zinc-500">Pick a teammate and select a reaction option</p>
+            </div>
+          </div>
+          <button onClick={close} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">
             <X className="h-5 w-5" />
           </button>
         </div>
+
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-1 block">Recipient</label>
-            <select name="receiverId" required className="w-full rounded-xl border border-zinc-200 p-2.5 text-sm">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5 block">
+              Recipient Teammate
+            </label>
+            <select
+              name="receiverId"
+              required
+              className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-sm font-medium focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+            >
               <option value="">-- Choose a teammate --</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name} ({u.email})
+                  {u.name || u.email} ({u.email})
                 </option>
               ))}
             </select>
           </div>
+
           <div>
-            <label className="text-sm font-medium mb-1 block">Moment of Recognition</label>
-            <textarea
-              required
-              name="message"
-              className="w-full rounded-xl border border-zinc-200 p-2.5 text-sm"
-              rows={3}
-              placeholder="What great work did they accomplish or how did they help you?"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-600">
+                Select Reaction Option
+              </label>
+              <span className="text-[11px] font-semibold text-orange-600">Tap to choose</span>
+            </div>
+            {/* Grid of Reaction Options */}
+            <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
+              {KUDOS_REACTION_OPTIONS.map((r) => {
+                const isSelected = selectedReaction.id === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedReaction(r)}
+                    className={cn(
+                      "flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition",
+                      isSelected
+                        ? "border-orange-500 bg-orange-50/90 ring-2 ring-orange-400/50 shadow-sm"
+                        : "border-zinc-200 bg-white hover:border-orange-200 hover:bg-orange-50/40"
+                    )}
+                  >
+                    <span className="text-2xl shrink-0">{r.emoji}</span>
+                    <div className="overflow-hidden">
+                      <div className="text-xs font-bold text-zinc-900 truncate">{r.label}</div>
+                      <div className="text-[10px] text-zinc-500 leading-tight line-clamp-1">{r.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="rounded-xl bg-orange-50 p-3 text-xs text-orange-700">
-            Sending Kudos will pin your note to the team's Aura Wall and award <b>+10 Aura</b> to your teammate!
+
+          {/* Selected Reaction Spotlight Banner */}
+          <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl animate-bounce">{selectedReaction.emoji}</span>
+              <div>
+                <p className="text-xs font-bold text-zinc-900">
+                  Reaction: <span className="text-orange-700">{selectedReaction.label}</span>
+                </p>
+                <p className="text-[11px] text-zinc-500">{selectedReaction.desc}</p>
+              </div>
+            </div>
+            <span className="rounded-full bg-orange-600 px-2.5 py-1 text-xs font-black text-white shadow-xs">
+              +10 Aura
+            </span>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100">
             <Button variant="outline" type="button" onClick={close}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Sending..." : "Send Kudos"}
+            <Button type="submit" disabled={loading} className="bg-orange-600 hover:bg-orange-700 text-white font-bold">
+              {loading ? "Reacting..." : `Send Reaction (+10 Aura)`}
             </Button>
           </div>
         </form>
