@@ -24,9 +24,11 @@
     "bullmq": "^6.3.11",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "dotenv": "^18.0.4",
     "express": "^4.21.2",
     "ioredis": "^6.0.0",
     "jose": "^6.2.12",
+    "kai-aura-workspace": "file:..",
     "nodemailer": "^10.0.13",
     "pg": "^8.23.0"
   },
@@ -36,7 +38,6 @@
     "@types/express": "^5.0.3",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",
-    "dotenv": "^18.0.4",
     "prisma": "7.10.0",
     "tsx": "^4.19.4",
     "typescript": "^5"
