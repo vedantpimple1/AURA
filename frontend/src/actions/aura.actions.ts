@@ -6,6 +6,14 @@ export async function getAuraBalanceAction(userId?: string) {
   return await apiClient.get('/aura/balance', userId ? { userId } : undefined);
 }
 
+export async function getCumulativeAuraAction(userId?: string) {
+  return await apiClient.get('/aura/balance', { type: 'cumulative', ...(userId ? { userId } : {}) });
+}
+
+export async function getAuraSummaryAction(userId?: string) {
+  return await apiClient.get('/aura/balance', { type: 'summary', ...(userId ? { userId } : {}) });
+}
+
 export async function getAuraHistoryAction() {
   return await apiClient.get('/aura/history');
 }

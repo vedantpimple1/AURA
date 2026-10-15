@@ -12,13 +12,30 @@ import { AuditService } from './audit.service';
 export class AuraService {
   
   /**
-   * Calculates a user's total available Aura points by summing transactions.
+   * Calculates a user's total available Aura points by summing all transactions (awards minus redemptions).
    */
   static async getAvailableAura(userId: string): Promise<number> {
     if (!userId) throw new ValidationError('User ID is required');
 
     const result = await prisma.auraTransaction.aggregate({
       where: { userId },
+      _sum: { amount: true }
+    });
+
+    return result._sum.amount || 0;
+  }
+
+  /**
+   * Calculates a user's cumulative Aura points earned across all positive awards and tasks.
+   */
+  static async getCumulativeAura(userId: string): Promise<number> {
+    if (!userId) throw new ValidationError('User ID is required');
+
+    const result = await prisma.auraTransaction.aggregate({
+      where: {
+        userId,
+        amount: { gt: 0 }
+      },
       _sum: { amount: true }
     });
 

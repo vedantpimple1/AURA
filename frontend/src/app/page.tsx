@@ -2,7 +2,7 @@ import { AuraApp } from "@/components/aura/aura-app";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getUsersAction } from "@/actions/user.actions";
-import { getAuraBalanceAction, getAuraHistoryAction } from "@/actions/aura.actions";
+import { getAuraBalanceAction, getCumulativeAuraAction, getAuraHistoryAction } from "@/actions/aura.actions";
 import { getTasksAction } from "@/actions/task.actions";
 import { getStoreItemsAction, getAllRedemptionsAction, getUserRedemptionsAction } from "@/actions/store.actions";
 import { getTeamsAction, getKudosAction } from "@/actions/team.actions";
@@ -42,10 +42,20 @@ export default async function Home({
   const realUsers = usersRes.success ? usersRes.data : [];
 
   const auraRes = await getAuraBalanceAction();
-  const initialAuraBalance = auraRes.success ? auraRes.data : 0;
+  const initialAuraBalance = auraRes.success && typeof auraRes.data === "number" ? auraRes.data : 0;
 
   const historyRes = await getAuraHistoryAction();
   const initialHistory = historyRes.success ? historyRes.data : [];
+
+  const cumulativeRes = await getCumulativeAuraAction();
+  let initialCumulativeAura = 0;
+  if (cumulativeRes.success && typeof cumulativeRes.data === "number") {
+    initialCumulativeAura = cumulativeRes.data;
+  } else if (Array.isArray(initialHistory)) {
+    initialCumulativeAura = initialHistory
+      .filter((tx: any) => tx.amount > 0)
+      .reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+  }
 
   const tasksRes = await getTasksAction();
   const initialTasks = tasksRes.success ? tasksRes.data : [];
@@ -100,6 +110,7 @@ export default async function Home({
       userName={session.email}
       initialUsers={realUsers}
       initialAuraBalance={initialAuraBalance}
+      initialCumulativeAura={initialCumulativeAura}
       initialHistory={initialHistory}
       initialTasks={initialTasks}
       initialStoreItems={initialStoreItems}

@@ -17,8 +17,24 @@ auraRouter.get('/balance', requireAuth, async (req: Request, res: Response): Pro
     const isAdmin = session.roles?.some(r => ['ADMIN', 'SUPERADMIN'].includes(r.toUpperCase()));
     const targetUserId = (isAdmin && requestedUserId) ? requestedUserId : session.userId;
 
-    const balance = await AuraService.getAvailableAura(targetUserId);
-    res.json({ success: true, data: balance });
+    const requestedType = req.query.type as string | undefined;
+    if (requestedType === 'cumulative') {
+      const cumulative = await AuraService.getCumulativeAura(targetUserId);
+      res.json({ success: true, data: cumulative });
+      return;
+    }
+
+    if (requestedType === 'summary') {
+      const [available, cumulative] = await Promise.all([
+        AuraService.getAvailableAura(targetUserId),
+        AuraService.getCumulativeAura(targetUserId),
+      ]);
+      res.json({ success: true, data: { available, cumulative } });
+      return;
+    }
+
+    const available = await AuraService.getAvailableAura(targetUserId);
+    res.json({ success: true, data: available });
   } catch (error) {
     const { statusCode, ...body } = handleError(error) as any;
     res.status(statusCode ?? 500).json({ success: false, ...body });

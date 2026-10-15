@@ -42,7 +42,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/actions/auth.actions";
 import { createUserAction } from "@/actions/user.actions";
-import { awardAuraAction, getAuraBalanceAction } from "@/actions/aura.actions";
+import { awardAuraAction, getAuraBalanceAction, getCumulativeAuraAction } from "@/actions/aura.actions";
 import { createTaskAction, submitTaskAction, reviewTaskAction, deleteTaskAction, updateAssignmentStatusAction } from "@/actions/task.actions";
 import { createStoreItemAction, redeemStoreItemAction, fulfillRedemptionAction } from "@/actions/store.actions";
 import { createTeamAction, sendKudosAction } from "@/actions/team.actions";
@@ -152,6 +152,7 @@ export function AuraApp({
   userName = "",
   initialUsers = [],
   initialAuraBalance = 0,
+  initialCumulativeAura = 0,
   initialHistory = [],
   initialTasks = [],
   initialStoreItems = [],
@@ -168,6 +169,7 @@ export function AuraApp({
   userName?: string;
   initialUsers?: any[];
   initialAuraBalance?: number;
+  initialCumulativeAura?: number;
   initialHistory?: any[];
   initialTasks?: any[];
   initialStoreItems?: any[];
@@ -247,6 +249,7 @@ export function AuraApp({
 
   // Dynamic Authoritative Aura Balance State
   const [auraBalance, setAuraBalance] = useState<number>(initialAuraBalance ?? 0);
+  const [cumulativeAura, setCumulativeAura] = useState<number>(initialCumulativeAura ?? 0);
   const [isBalanceLoading, setIsBalanceLoading] = useState<boolean>(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [currentStoreItems, setCurrentStoreItems] = useState<any[]>(initialStoreItems);
@@ -259,6 +262,12 @@ export function AuraApp({
   }, [initialAuraBalance]);
 
   useEffect(() => {
+    if (typeof initialCumulativeAura === "number") {
+      setCumulativeAura(initialCumulativeAura);
+    }
+  }, [initialCumulativeAura]);
+
+  useEffect(() => {
     if (initialStoreItems) setCurrentStoreItems(initialStoreItems);
   }, [initialStoreItems]);
 
@@ -266,16 +275,22 @@ export function AuraApp({
     if (initialRedemptions) setCurrentRedemptions(initialRedemptions);
   }, [initialRedemptions]);
 
-  // Refresh balance from authoritative backend API
+  // Refresh balance and cumulative points from authoritative backend API
   const refreshBalance = async () => {
     setIsBalanceLoading(true);
     setBalanceError(null);
     try {
-      const res = await getAuraBalanceAction();
+      const [res, cumRes] = await Promise.all([
+        getAuraBalanceAction(),
+        getCumulativeAuraAction(),
+      ]);
       if (res.success && typeof res.data === "number") {
         setAuraBalance(res.data);
       } else {
         setBalanceError((res as any)?.error || "Unable to retrieve balance");
+      }
+      if (cumRes.success && typeof cumRes.data === "number") {
+        setCumulativeAura(cumRes.data);
       }
     } catch (err: any) {
       setBalanceError(err.message || "Failed to reach balance service");
@@ -656,6 +671,8 @@ export function AuraApp({
                 go={setPage}
                 open={setTask}
                 balance={auraBalance}
+                availableAura={auraBalance}
+                cumulativeAura={cumulativeAura}
                 initialTasks={initialTasks}
                 userName={userName}
                 topTeam={initialTeams?.[0]}
@@ -960,6 +977,8 @@ function MemberHome({
   go,
   open,
   balance = 0,
+  availableAura,
+  cumulativeAura,
   initialTasks,
   userName,
   topTeam,
@@ -967,13 +986,18 @@ function MemberHome({
   go: (p: Page) => void;
   open: (t: any) => void;
   balance?: number;
+  availableAura?: number;
+  cumulativeAura?: number;
   initialTasks?: any[];
   userName?: string;
   topTeam?: any;
 }) {
   const displayName = userName ? (userName.includes("@") ? userName.split("@")[0] : userName) : "✨";
 
-  // Innovative Gamified Aura Tier System
+  const displayCumulative = cumulativeAura ?? balance ?? 0;
+  const displayAvailable = availableAura ?? balance ?? 0;
+
+  // Innovative Gamified Aura Tier System - Based on Lifetime Cumulative Aura
   const tiers = [
     { name: "Spark Initiate", min: 0, max: 2000, level: 1 },
     { name: "Blaze Catalyst", min: 2000, max: 5000, level: 2 },
@@ -981,12 +1005,12 @@ function MemberHome({
     { name: "AI Champion", min: 10000, max: 15000, level: 4 },
     { name: "Radiant Luminary", min: 15000, max: 25000, level: 5 },
   ];
-  const currentTier = tiers.find((t) => (balance || 0) >= t.min && (balance || 0) < t.max) || tiers[tiers.length - 1];
+  const currentTier = tiers.find((t) => displayCumulative >= t.min && displayCumulative < t.max) || tiers[tiers.length - 1];
   const nextTier = tiers.find((t) => t.level === currentTier.level + 1) || null;
   const progressPercent = nextTier
-    ? Math.min(100, Math.max(0, Math.round((((balance || 0) - currentTier.min) / (nextTier.min - currentTier.min)) * 100)))
+    ? Math.min(100, Math.max(0, Math.round(((displayCumulative - currentTier.min) / (nextTier.min - currentTier.min)) * 100)))
     : 100;
-  const auraToNext = nextTier ? Math.max(0, nextTier.min - (balance || 0)) : 0;
+  const auraToNext = nextTier ? Math.max(0, nextTier.min - displayCumulative) : 0;
 
   return (
     <>
@@ -1031,21 +1055,30 @@ function MemberHome({
           <div>
             <div className="flex items-center gap-2">
               <span className="inline-block text-xs font-extrabold uppercase tracking-[0.2em] text-amber-200">
-                AVAILABLE AURA BALANCE
+                CUMULATIVE AURA EARNED
               </span>
               <span className="rounded-full bg-amber-400/30 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
                 Level {currentTier.level}
               </span>
             </div>
 
-            {/* Eye-catching glowing number display */}
+            {/* Eye-catching glowing cumulative number display */}
             <div className="mt-3 flex items-baseline gap-3">
               <span className="text-6xl font-black tracking-tight text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.25)] sm:text-7xl lg:text-8xl">
-                ✨ {(balance || 0).toLocaleString()}
+                ✨ {displayCumulative.toLocaleString()}
               </span>
               <div className="flex flex-col">
                 <span className="text-2xl font-black tracking-wide text-amber-200 sm:text-3xl">AURA</span>
-                <span className="text-xs font-semibold text-white/80">Ready to redeem or award</span>
+                <span className="text-xs font-semibold text-white/80">Lifetime earned across tasks & awards</span>
+              </div>
+            </div>
+
+            {/* Available to Spend in Store Showcase Badge */}
+            <div className="mt-4 flex items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-white/30 bg-black/25 px-4 py-2 text-xs backdrop-blur-md shadow-inner">
+                <span className="text-amber-400 font-extrabold text-sm">⚡</span>
+                <span className="font-medium text-amber-100">Available to Spend in Store:</span>
+                <span className="font-black text-white text-sm">{displayAvailable.toLocaleString()} Aura</span>
               </div>
             </div>
 
@@ -2414,7 +2447,7 @@ function StorePage({
           data-testid="store-available-aura-balance"
           className="flex items-center gap-2.5 rounded-xl border border-amber-200/90 bg-gradient-to-r from-amber-50/90 via-orange-50/80 to-amber-50/90 px-3.5 py-2 text-xs shadow-sm self-start sm:self-auto"
         >
-          <span className="font-semibold text-zinc-600">Available Aura</span>
+          <span className="font-bold text-zinc-700">Available Balance to Spend</span>
           <span className="text-zinc-300">|</span>
           {isBalanceLoading ? (
             <span className="flex items-center gap-1.5 text-amber-800 font-medium">
@@ -2429,7 +2462,7 @@ function StorePage({
             <span className="flex items-center gap-1 font-extrabold text-orange-950">
               <span className="text-orange-600">⚡</span>
               <span>{(availableAura ?? 0).toLocaleString()}</span>
-              <span className="font-bold text-orange-800">Aura</span>
+              <span className="font-bold text-orange-800">Aura to Spend</span>
             </span>
           )}
           {onRefreshBalance && (
