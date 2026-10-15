@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npx tsx --env-file=.env src/server.ts",
+    "dev": "tsx --env-file=.env src/server.ts",
     "start": "node dist/src/server.js",
-    "build": "tsc",
-    "test": "npx tsx --env-file=.env --test --test-concurrency=1 tests/*.test.ts",
-    "worker": "npx tsx --env-file=.env src/worker.ts",
-    "db:migrate": "npx prisma migrate deploy",
-    "db:generate": "npx prisma generate",
-    "db:seed": "npx tsx --env-file=.env prisma/seed.ts",
-    "db:studio": "npx prisma studio"
+    "build": "prisma generate && tsc",
+    "test": "tsx --env-file=.env --test --test-concurrency=1 tests/*.test.ts",
+    "worker": "tsx --env-file=.env src/worker.ts",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:seed": "tsx --env-file=.env prisma/seed.ts",
+    "db:studio": "prisma studio"
   },
   "prisma": {
     "seed": "npx tsx --env-file=.env prisma/seed.ts"
@@ -28,19 +28,18 @@
     "express": "^4.21.2",
     "ioredis": "^6.0.0",
     "jose": "^6.2.12",
-    "kai-aura-workspace": "file:..",
     "nodemailer": "^10.0.13",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "prisma": "7.10.0",
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/express": "^5.0.3",
+    "@types/cors": "^2.8.17",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/nodemailer": "^8.0.2"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.3",
-    "@types/node": "^20",
-    "@types/nodemailer": "^8.0.2",
-    "prisma": "7.10.0",
-    "tsx": "^4.19.4",
-    "typescript": "^5"
+    "tsx": "^4.19.4"
   },
   "description": "KAI Aura — Backend API Server (Express + Prisma + BullMQ)",
   "main": "dist/src/server.js",
