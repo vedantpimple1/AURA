@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+.env*.local
+*.env
+!.env.example
+*.pem
+*.key
+*.cert
+*.tsbuildinfo

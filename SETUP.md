@@ -63,27 +63,43 @@ JWT_SECRET="your-super-secret-jwt-key"
 
 ---
 
-## 4. Running the Application
+## 4. Running the Independent Services (Decoupled Architecture)
 
-Start the Next.js development server:
+The codebase is organized into independently deployable `frontend/` and `backend/` applications:
+
+### A. Running the Backend API Server
 ```bash
+cd backend
 npm run dev
 ```
+- **API URL:** `http://localhost:4000`
+- **Health Check:** `http://localhost:4000/api/health`
+- **Background Delivery Worker (BullMQ / DB Polling):**
+  ```bash
+  npm run worker
+  ```
 
-The application will be available at [http://localhost:3000](http://localhost:3000).
+### B. Running the Frontend Application
+```bash
+cd frontend
+npm run dev
+```
+- **Web App URL:** `http://localhost:3000`
+- Configured to route API requests to the backend via `API_URL` and `NEXT_PUBLIC_API_URL` environment variables.
 
 ### Logging In
-After running the seed script, you can log into the application using the default System Admin account:
-- **Email:** `admin@kaiaura.com`
-- **Password:** `admin123`
+After running the database seed, log in using the seed accounts:
+- **Admin:** `admin@kaiaura.com` / `admin123`
+- **Member:** `member@kaiaura.com` / `member123`
 
 ---
 
-## 5. Current Features (Up to Phase 05)
-- **Authentication:** Edge middleware-protected routes using JWT cookies.
-- **RBAC (Role-Based Access Control):** Differentiated views for `Member`, `Admin`, and `Superadmin`.
-- **User Management:** Admins can dynamically add new users to the database directly from the "Members" UI.
-- **Aura Ledger:** A strict, append-only financial ledger tracking Aura points.
-- **Points Awarding:** Admins can manually award Aura to users via the "Award Aura" modal.
-- **Store Redemptions:** Users can spend Aura in the Store, resulting in negative ledger transactions.
-- **Transaction History:** A fully dynamic receipt ledger tracking all points earned and spent.
+## 5. Current Features (All Phases Complete)
+- **Decoupled Architecture:** Standalone Express backend (`backend/`) and Next.js frontend (`frontend/`).
+- **Authentication:** Edge & Express cookie-protected routes using JWT with Jose.
+- **RBAC:** Member, Admin, and Superadmin roles with scoped permissions.
+- **Aura Ledger & Social:** Real-time point transactions, weekly leaderboard, squads, and peer kudos.
+- **Tasks & Reviews:** Admin task creation, assignment, member submission, and review approvals.
+- **Store & Redemptions:** Rewards catalog with image support, atomic checkouts, and admin fulfillment queue.
+- **Notifications & Observability:** Real-time in-app bell, email dispatch, BullMQ queue, retry engine, and delivery observability dashboard.
+- **AI Integration:** Automated task breakdown and squad momentum insights.

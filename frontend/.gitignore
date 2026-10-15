@@ -1,0 +1,14 @@
+node_modules/
+.next/
+dist/
+.env
+.env.*
+.env.local
+.env*.local
+*.env
+!.env.example
+*.pem
+*.key
+*.cert
+*.tsbuildinfo
+next-env.d.ts

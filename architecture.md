@@ -289,3 +289,29 @@ NotificationObservabilityService (Admin Dashboard)
   - Allows `ADMIN` and `SUPERADMIN` to re-queue eligible `FAILED` or stuck `PROCESSING` deliveries.
   - Reset delivery record to `PENDING`, resets attempts to 0, clears error details, and enqueues to BullMQ.
   - Enforced server-side via `assertAdminAuthorization()`. `MEMBER` role is denied (`403 FORBIDDEN`).
+
+---
+
+## 23. Decoupled Deployment-Ready Architecture (Frontend & Backend Partitioning)
+
+The KAI Aura application is partitioned into two independent, standalone tiers:
+
+```
+┌─────────────────────────────────┐           ┌────────────────────────────────────────┐
+│     frontend/ (Next.js 16)      │           │          backend/ (Express)            │
+│  - React 19 UI & Impeccable CSS │  REST/    │  - Express REST Routes (/api/*)        │
+│  - Universal api-client.ts      │  Cookies  │  - requireAuth RBAC Middleware         │
+│  - Next.js Server Actions       │ ────────> │  - Prisma 7 ORM & PostgreSQL           │
+│  - No Prisma / No DB / No BullMQ│           │  - BullMQ & Standalone Worker          │
+│  - Config: API_URL              │           │  - Config: FRONTEND_URL, DATABASE_URL  │
+└─────────────────────────────────┘           └────────────────────────────────────────┘
+```
+
+### 1. Key Principles
+- **Zero Client-Tier Database Coupling**: The `frontend/` directory has zero direct database connections, Prisma dependencies, or queue workers.
+- **Universal API Bridge**: All Next.js Server Components, Server Actions, and client components invoke backend endpoints via [`src/lib/api-client.ts`](frontend/src/lib/api-client.ts).
+- **Session Forwarding**: The HTTP-only `session` JWT cookie is automatically passed through server-side fetch calls via `next/headers` to the backend Express server, maintaining unified authentication without client-side token exposure.
+- **Independent Deployability**:
+  - `frontend/` can be deployed to Vercel, Netlify, or Cloudflare Pages.
+  - `backend/` can be deployed to Railway, Render, Fly.io, or AWS ECS as a standard Node.js server with attached PostgreSQL and Redis.
+

@@ -1,13 +1,13 @@
 # KAI Aura App - Project Memory
 
 ## 1. Current Project Phase
-PAUSED (Stable Baseline) — All phases through SMTP-09 & Phase 12 Completed & Hardened. Ready for PHASE-13: Performance + Production Readiness or PHASE-14: Deployment + CI/CD.
+COMPLETED (Deployment-Ready Frontend/Backend Architecture Reorganization — All Phases 0 through 6 Verified).
 
 ## 2. Current Iteration ID
-KAI-12-014
+KAI-14-002
 
 ## 3. Current Implementation Status
-Phases 00 through 12 + SMTP-01 through SMTP-09 are fully implemented, verified, hardened, and running against PostgreSQL with Prisma 7.10.0. All 72 test assertions pass (100%).
+Phases 0 through 6 of the codebase reorganization are 100% complete. The application is cleanly partitioned into independent `frontend/` (Next.js 16) and `backend/` (Express + Prisma 7) directories, communicating via REST and JWT cookies. Both build cleanly, all backend test suites pass with 100% success rate, and live integration tests verify operational health.
 - **Phase 07 (Teams / Collaboration / Social Aura Wall):** Completed & verified.
 - **Phase 08 (Store / Rewards):** Completed & verified (including Admin REDEMPTION_REQUESTED alerts).
 - **Phase 09 (AI Features):** Completed & verified (AI Task Breakdown + AI Squad Momentum Insights).
@@ -353,3 +353,82 @@ All SMTP notification systems (SMTP-01 through SMTP-09) are 100% complete and co
   - **Objective**: Allow ADMIN and SUPERADMIN users to optionally provide an external image URL when creating Store products, while preserving existing Store architecture.
   - **Changes**: Leveraged existing `imageUrl` field in the Prisma `StoreItem` schema. Updated `createStoreItemAction` to securely validate and parse HTTP/HTTPS URLs while rejecting invalid payloads or malicious schemas (e.g. `javascript:`). Updated `AddProductModal` with the new input field. Created resilient `StoreProductImage` UI component with an `onError` state fallback to the existing `Package` icon to ensure broken image links do not crash the layout.
   - **Test Results**: 100% test pass rate (`npm test`), build succeeded with 0 errors. All previous features remain completely intact.
+- **[KAI-14-001] [2026-10-13]**: Deployment-Ready Frontend/Backend Codebase Organization (Phases 0, 1, and 2)
+  - **Objective**: Reorganize monolithic repository into independently deployable `frontend/` and `backend/` applications communicating via environment-configured HTTP REST APIs and JWT session cookies.
+  - **Backend Extraction (`backend/`)**:
+    - Standalone Express + TypeScript server listening on port 4000 (`src/server.ts`).
+    - Configurable CORS with credential support bound to `FRONTEND_URL`.
+    - Express cookie-based JWT session verification and role-based access control middleware (`src/middleware/requireAuth.ts`).
+    - Dedicated REST route modules for all 11 domains: `auth`, `user`, `aura`, `task`, `store`, `team`, `notification`, `observability`, `analytics`, `audit`, and `ai`.
+    - Integrated background delivery worker supporting BullMQ/Redis with database polling fallback (`src/worker.ts`).
+    - Independent `package.json`, `tsconfig.json`, `prisma/`, and `.env.example`.
+    - Verification: `npx prisma generate` generated Prisma client 7.10.0; `npx tsc --noEmit` and `npm run build` completed with 0 errors; live health check `GET /api/health` confirmed operational.
+  - **Frontend Extraction (`frontend/`)**:
+    - Standalone Next.js 16 + React 19 + Tailwind CSS application (`frontend/`).
+    - Zero database/Prisma/BullMQ dependencies in the client/frontend tier.
+    - Universal API client (`src/lib/api-client.ts`) bridging Server Components, Server Actions, and browser requests to backend endpoints via `API_URL` and `NEXT_PUBLIC_API_URL` with automated cookie forwarding.
+    - Preserved all Impeccable UI components, modals, streak badges, celebration confetti, and design system tokens.
+    - 11 server action modules refactored to delegate data mutations and queries to backend REST endpoints.
+    - Verification: `npx tsc --noEmit` and `npm run build` (Next.js Turbopack) built all static and dynamic routes cleanly with exit code 0.
+- **[KAI-14-002] [2026-10-14]**: Live Integration Testing, Test Suite Porting, & Final Documentation (Phases 5 and 6)
+  - **Objective**: Execute end-to-end live integration tests across independent frontend and backend servers, port automated test suites to the backend, update architectural documentation, and declare reorganization complete.
+  - **Live Integration Testing**:
+    - Backend launched on port 4000 (`http://localhost:4000/api/health` ➔ `200 OK`).
+    - Frontend launched on port 3000 (`http://localhost:3000`).
+    - Automated API test suite validated: login authentication (`POST /api/auth/login`), cookie decoding (`GET /api/auth/me`), balance computation (`GET /api/aura/balance`), task fetching (`GET /api/tasks`), store catalog (`GET /api/store/items`), squad listing (`GET /api/teams`), and observability metrics (`GET /api/observability/summary`). All endpoints responded with `success: true`.
+  - **Backend Test Suite Execution**:
+    - Ported test suites to `backend/tests/`.
+    - Refactored `queue-worker.test.ts` to test `NotificationObservabilityService.retryDelivery` directly on backend.
+    - Ran all test suites: 100% passed (0 failed).
+  - **Documentation & Architecture**:
+- **[KAI-14-003] [2026-10-14]**: Deployment File Cleanup & Monorepo Streamlining
+  - **Objective**: Purge all redundant, obsolete, and non-deployment files to streamline deployment and ensure deterministic, minimal release artifacts.
+  - **Pruned / Cleaned Up**:
+    - Removed root legacy `node_modules/` (861 MB) left over from the monolithic setup.
+    - Removed root legacy `package-lock.json` (239 KB, 8,134 lines) referencing the old monolithic structure.
+    - Generated deterministic `frontend/package-lock.json` alongside `backend/package-lock.json`.
+    - Removed redundant `.agent/` folder containing binary executables.
+    - Relocated historical report `smtp-consolidated-report.md` to `docs/reports/`.
+    - Verified all legacy source roots (`src/`, `prisma/`, `tests/`, `public/`, `scratch/`, `Photosss/`, `next.config.ts`, `postcss.config.mjs`, `components.json`) were completely pruned from the root.
+  - **Verification**: Verified `npm run build:backend` (0 errors), `npm run build:frontend` (Next.js 16 Turbopack, 0 errors), and `npm test` (all 23 backend test suites pass with 0 failures).
+- **[KAI-14-004] [2026-10-14]**: Deployment Remediation & Acceptance Gate Completion (Render + Vercel)
+  - **Objective**: Resolve all verified blocker and high-severity findings from `docs/deployment/production-deployment-audit.md` to achieve 100% independent deployability.
+  - **Remediated Items**:
+    - `FINDING-01`: Updated `backend/package.json` `"start"` and `"main"` to `dist/src/server.js`. Verified server starts and returns `200 OK` on `/api/health`.
+    - `FINDING-02`: Removed `"kai-aura-workspace": "file:.."` from `frontend/package.json` and regenerated isolated lockfile.
+    - `FINDING-03`: Aligned 3 API contracts in `frontend/src/actions/`: `/notifications/jobs/email-processor`, `/notifications/preferences/:type`, `/notifications/preferences` (DELETE), and `/ai/breakdown-task`.
+    - `FINDING-04`: Verified `node dist/src/worker.js` entry point and execution parameters for Render Background Worker.
+    - `FINDING-05`: Created `frontend/eslint.config.mjs` flat configuration and updated `"lint"` script to `"eslint src"`. Verified `npm run lint` passes with 0 errors.
+    - `FINDING-06`: Implemented graceful HTTP connection draining and Prisma pool disconnection (`SIGTERM`/`SIGINT`) in `backend/src/server.ts`.
+    - `FINDING-07`: Updated `backend/prisma/seed.ts` to allow `SUPERADMIN_DEFAULT_PASSWORD` environment variable override.
+  - **Verification**: All 26 test suites / 75 assertions pass with 0 failures (`npm test`). Both frontend and backend production builds compile with 0 errors. Status: `READY FOR STAGING DEPLOYMENT`.
+- **[KAI-14-005] [2026-10-14]**: Render Managed PostgreSQL Migration & Database Configuration
+  - **Objective**: Deploy schema and copy all active data from local database (`kai_aura_dev`) to Render Managed PostgreSQL instance (`aura_db_yhg1`), configure backend environment variables, and verify end-to-end connectivity.
+  - **Actions Taken**:
+    - Ran `npx prisma migrate deploy` targeting Render PostgreSQL (`dpg-db7kf0dg1s2s73as8qdg-a.singapore-postgres.render.com`) to apply all 4 Prisma migrations cleanly.
+    - Exported and migrated data across all 22 domain tables in topological foreign-key order using parameterized queries.
+    - Verified 100% row match between local and Render databases (User: 65, Notification: 165, NotificationDelivery: 151, NotificationPreference: 20, AuraTransaction: 14, Task: 12, TaskAssignment: 12, StoreItem: 9, Kudos: 9, Team: 5, TeamMember: 5, Redemption: 5, Role: 3, AuditLog: 2, Batch: 1).
+    - Hardened `backend/src/lib/prisma.ts` and `backend/prisma/seed.ts` with conditional SSL (`rejectUnauthorized: false`) for cloud-hosted PostgreSQL instances.
+    - Configured `DATABASE_URL` in `backend/.env` and root `.env` to `postgresql://aura_db_yhg1_user:EhgK70b82AfCR1dp9RjcRPY9G0ABJyOJ@dpg-db7kf0dg1s2s73as8qdg-a.singapore-postgres.render.com/aura_db_yhg1?sslmode=require`.
+  - **Verification**:
+    - `npx prisma migrate status` confirms database schema is up to date with 4 applied migrations.
+    - Backend build (`npm run build`) succeeded with 0 errors.
+    - Backend test suite (`npm test`) executed 26 test suites and 75 tests directly against the Render database with 100% pass rate (75 passed, 0 failed).
+- **[KAI-14-006] [2026-10-15]**: Member Store Available Aura Balance Integration & Verification
+  - **Objective**: Display the logged-in member's authoritative Available Aura Balance on the Store page in the horizontal control row alongside "Browse Rewards" and "My Redemptions", and ensure real-time balance refresh on store item redemption without requiring a manual page reload.
+  - **Existing Implementation Traced**:
+    - **Balance Source & Formula**: Traced authoritative balance calculation to `AuraService.getAvailableAura(userId)` in `backend/src/services/aura.service.ts`, which dynamically aggregates all user transactions (`sum(amount)`) on the append-only `AuraTransaction` ledger.
+    - **Redemption Validation**: `StoreService.redeemStoreItem(userId, storeItemId)` validates that `AuraService.getAvailableAura(userId) >= item.basePrice` before creating a negative transaction (`type: 'REDEMPTION'`, `amount: -item.basePrice`) inside an atomic database transaction.
+    - **Authentication & Authorization**: Non-admins are restricted by `GET /api/aura/balance` to their verified `session.userId`, preventing parameter manipulation.
+  - **Frontend UI & State Integration**:
+    - Embedded the Available Aura Balance component (`data-testid="store-available-aura-balance"`) into the horizontal navigation row of `StorePage` alongside "Browse Rewards" and "My Redemptions" / "Redemption Requests".
+    - Followed the KAI Aura design system: `Available Aura | ⚡ {balance.toLocaleString()} Aura` with amber-gradient styling, pulse loading state, and error fallback.
+    - Managed reactive `auraBalance` state in `AuraApp`, refreshing authoritatively via `getAuraBalanceAction()` when opening the store tab and immediately updating after successful redemption without requiring a manual page reload.
+    - Updated `StoreService.redeemStoreItem` to include `remainingBalance` in the response payload.
+  - **Verification & Testing**:
+    - Added comprehensive integration test suite `backend/tests/store-balance-integration.test.ts` verifying ledger aggregation, insufficient funds rejection, authoritative remaining balance return, and session isolation.
+    - Executed full test suite: **30 test suites, 79 tests, 79 passed, 0 failed** (`npm test`).
+    - Verified Next.js 16 frontend build (`npm run build`: 0 errors) and ESLint (`npm run lint`: 0 errors).
+    - Executed end-to-end SSR and API verification confirming rendered HTML reflects the live member balance.
+
+
