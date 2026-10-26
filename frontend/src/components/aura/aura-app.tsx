@@ -82,6 +82,30 @@ type Page =
   | "deliveries"
   | "settings";
 
+// The 7-Level Gamified Tier System - Allotments based on Lifetime Cumulative Aura
+export interface AuraTier {
+  level: number;
+  name: string;
+  min: number;
+  max: number;
+  badgeUrl: string;
+}
+
+export const AURA_TIERS: AuraTier[] = [
+  { level: 1, name: "Cosmic Rookie", min: 0, max: 5000, badgeUrl: "/badges/level-1-cosmic-rookie.png" },
+  { level: 2, name: "Lunar Explorer", min: 5000, max: 15000, badgeUrl: "/badges/level-2-lunar-explorer.png" },
+  { level: 3, name: "Stellar Riser", min: 15000, max: 30000, badgeUrl: "/badges/level-3-stellar-riser.png" },
+  { level: 4, name: "Solar Flare", min: 30000, max: 50000, badgeUrl: "/badges/level-4-solar-flare.png" },
+  { level: 5, name: "Cosmic Force", min: 50000, max: 100000, badgeUrl: "/badges/level-5-cosmic-force.png" },
+  { level: 6, name: "Galactic Legend", min: 100000, max: 200000, badgeUrl: "/badges/level-6-galactic-legend.png" },
+  { level: 7, name: "Universal Icon", min: 200000, max: Infinity, badgeUrl: "/badges/level-7-universal-icon.png" },
+];
+
+export function getTierForAura(points: number = 0): AuraTier {
+  const pts = Math.max(0, points || 0);
+  return AURA_TIERS.find((t) => pts >= t.min && pts < t.max) || AURA_TIERS[AURA_TIERS.length - 1];
+}
+
 let members = [
   "Aarav Sharma",
   "Maya Patel",
@@ -722,7 +746,7 @@ export function AuraApp({
             />
           )}
           {page === "history" && <History history={initialHistory} />}
-          {page === "profile" && <Profile userName={userName} balance={auraBalance} />}
+          {page === "profile" && <Profile userName={userName} balance={auraBalance} cumulativeAura={cumulativeAura} />}
           {page === "tag" && (
             <TagTeams
               teams={initialTeams}
@@ -997,15 +1021,9 @@ function MemberHome({
   const displayCumulative = cumulativeAura ?? balance ?? 0;
   const displayAvailable = availableAura ?? balance ?? 0;
 
-  // Innovative Gamified Aura Tier System - Based on Lifetime Cumulative Aura
-  const tiers = [
-    { name: "Spark Initiate", min: 0, max: 2000, level: 1 },
-    { name: "Blaze Catalyst", min: 2000, max: 5000, level: 2 },
-    { name: "Aurora Achiever", min: 5000, max: 10000, level: 3 },
-    { name: "AI Champion", min: 10000, max: 15000, level: 4 },
-    { name: "Radiant Luminary", min: 15000, max: 25000, level: 5 },
-  ];
-  const currentTier = tiers.find((t) => displayCumulative >= t.min && displayCumulative < t.max) || tiers[tiers.length - 1];
+  // The 7-Level Gamified Tier System - Based on Lifetime Cumulative Aura
+  const tiers = AURA_TIERS;
+  const currentTier = getTierForAura(displayCumulative);
   const nextTier = tiers.find((t) => t.level === currentTier.level + 1) || null;
   const progressPercent = nextTier
     ? Math.min(100, Math.max(0, Math.round(((displayCumulative - currentTier.min) / (nextTier.min - currentTier.min)) * 100)))
@@ -1057,8 +1075,8 @@ function MemberHome({
               <span className="inline-block text-xs font-extrabold uppercase tracking-[0.2em] text-amber-200">
                 CUMULATIVE AURA EARNED
               </span>
-              <span className="rounded-full bg-amber-400/30 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
-                Level {currentTier.level}
+              <span className="rounded-full bg-amber-400/30 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                Level {currentTier.level} · {currentTier.name}
               </span>
             </div>
 
@@ -1108,18 +1126,22 @@ function MemberHome({
             </div>
           </div>
 
-          {/* Gamified Tier Card with Holographic Aura Core */}
+          {/* Gamified Tier Card with Circular Cosmic Badge */}
           <div className="relative rounded-2xl border border-white/25 bg-white/15 p-5 shadow-inner backdrop-blur-lg">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-2xl text-orange-600 shadow-md">
-                  <Trophy className="h-6 w-6 text-amber-500" />
-                </span>
+              <div className="flex items-center gap-3.5">
+                <div className="relative h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 transition-transform duration-300 hover:scale-110">
+                  <img
+                    src={currentTier.badgeUrl}
+                    alt={currentTier.name}
+                    className="h-full w-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+                  />
+                </div>
                 <div>
-                  <p className="text-[11px] font-bold tracking-wider text-amber-200 uppercase">
-                    CURRENT TIER
+                  <p className="text-[11px] font-extrabold tracking-wider text-amber-200 uppercase">
+                    CURRENT TIER · LEVEL {currentTier.level}
                   </p>
-                  <p className="text-lg font-black text-white">{currentTier.name}</p>
+                  <p className="text-lg sm:text-xl font-black text-white tracking-tight">{currentTier.name}</p>
                 </div>
               </div>
               <span className="rounded-full bg-white/20 px-2.5 py-1 text-xs font-extrabold text-white">
@@ -1130,8 +1152,8 @@ function MemberHome({
             {/* Glowing Progress Bar */}
             <div className="mt-5">
               <div className="flex justify-between text-xs font-medium text-amber-100">
-                <span>{(balance || 0).toLocaleString()} Aura</span>
-                <span>{nextTier ? `${nextTier.min.toLocaleString()} Aura` : "Max Tier"}</span>
+                <span>{displayCumulative.toLocaleString()} Aura</span>
+                <span>{nextTier ? `${nextTier.min.toLocaleString()} Aura` : "Max Tier (200k+)"}</span>
               </div>
               <div className="mt-2 h-3.5 w-full overflow-hidden rounded-full bg-black/20 p-0.5">
                 <div
@@ -1141,8 +1163,8 @@ function MemberHome({
               </div>
               <p className="mt-2.5 text-xs text-amber-100/90 font-medium">
                 {nextTier
-                  ? `⚡ Only ${auraToNext.toLocaleString()} Aura needed to unlock ${nextTier.name}!`
-                  : "🌟 Maximum Tier reached! You are an Aura Luminary."}
+                  ? `⚡ Only ${auraToNext.toLocaleString()} Aura needed to unlock Level ${nextTier.level} · ${nextTier.name}!`
+                  : "🌟 Maximum Tier reached! You are a Universal Icon."}
               </p>
             </div>
           </div>
@@ -1365,7 +1387,7 @@ function Feed() {
             {i === 0
               ? "completed Product story mapping"
               : i === 1
-              ? "unlocked the Comet badge"
+              ? "unlocked the Cosmic Rookie badge"
               : "reacted with 🔥 Crushing It to Kabir"}
             <small className="block text-zinc-400">2 hours ago</small>
           </p>
@@ -1993,7 +2015,10 @@ function Leaderboard() {
               <b className="mt-2 block max-w-[110px] truncate text-xs sm:text-sm font-bold text-zinc-900">
                 {top[1] || "Silver Star"}
               </b>
-              <span className="text-[10px] text-zinc-400 font-medium">Aurora badge</span>
+              <span className="inline-flex items-center gap-1 text-[10px] text-zinc-500 font-medium">
+                <img src="/badges/level-2-lunar-explorer.png" alt="Lunar Explorer" className="h-3 w-3 object-contain inline-block" />
+                Lunar Explorer
+              </span>
               <p className="mt-1 text-xs sm:text-sm font-black text-slate-700">10,000 Aura</p>
             </div>
 
@@ -2028,7 +2053,10 @@ function Leaderboard() {
               <b className="mt-2 block max-w-[120px] truncate text-sm sm:text-base font-extrabold text-zinc-900">
                 {top[0] || "Gold Champion"}
               </b>
-              <span className="text-[11px] font-semibold text-amber-600">AI Champion</span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700">
+                <img src="/badges/level-2-lunar-explorer.png" alt="Lunar Explorer" className="h-3.5 w-3.5 object-contain inline-block" />
+                Lunar Explorer
+              </span>
               <p className="mt-1 text-sm sm:text-base font-black text-orange-600">12,000 Aura</p>
             </div>
 
@@ -2060,7 +2088,10 @@ function Leaderboard() {
               <b className="mt-2 block max-w-[110px] truncate text-xs sm:text-sm font-bold text-zinc-900">
                 {top[2] || "Bronze Victor"}
               </b>
-              <span className="text-[10px] text-zinc-400 font-medium">Spark badge</span>
+              <span className="inline-flex items-center gap-1 text-[10px] text-zinc-500 font-medium">
+                <img src="/badges/level-2-lunar-explorer.png" alt="Lunar Explorer" className="h-3 w-3 object-contain inline-block" />
+                Lunar Explorer
+              </span>
               <p className="mt-1 text-xs sm:text-sm font-black text-amber-800">8,000 Aura</p>
             </div>
 
@@ -2089,6 +2120,8 @@ function Leaderboard() {
         {members.slice(3, 15).map((m, i) => {
           const rank = i + 4;
           const own = m === "Aarav Sharma";
+          const points = (10 - i) * 1000;
+          const tier = getTierForAura(points);
           return (
             <div
               className={cn("flex items-center gap-3 border-b p-4 last:border-0 transition hover:bg-orange-50/40", own && "bg-orange-50/70")}
@@ -2101,9 +2134,12 @@ function Leaderboard() {
                   {m}
                   {own && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">You</span>}
                 </b>
-                <small className="block text-xs text-zinc-500">Spark badge</small>
+                <small className="flex items-center gap-1 text-xs text-zinc-500">
+                  <img src={tier.badgeUrl} alt={tier.name} className="h-3.5 w-3.5 object-contain inline-block" />
+                  {tier.name}
+                </small>
               </span>
-              <b className="text-sm font-bold text-orange-600">{10 - i}000 Aura</b>
+              <b className="text-sm font-bold text-orange-600">{points.toLocaleString()} Aura</b>
             </div>
           );
         })}
@@ -4320,8 +4356,18 @@ function History({ history }: { history: any[] }) {
   );
 }
 
-function Profile({ userName, balance }: { userName?: string; balance?: number }) {
+function Profile({
+  userName,
+  balance,
+  cumulativeAura,
+}: {
+  userName?: string;
+  balance?: number;
+  cumulativeAura?: number;
+}) {
   const displayName = userName ? (userName.includes("@") ? userName.split("@")[0] : userName) : "Member";
+  const cumulative = cumulativeAura ?? balance ?? 0;
+  const currentTier = getTierForAura(cumulative);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -4329,13 +4375,28 @@ function Profile({ userName, balance }: { userName?: string; balance?: number })
       <Card className="overflow-hidden">
         <div className="h-24 bg-gradient-to-r from-orange-600 to-amber-600" />
         <div className="p-6">
-          <Avatar name={displayName} />
+          <div className="flex items-center justify-between">
+            <Avatar name={displayName} />
+            <div className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/80 px-3 py-1.5 shadow-sm">
+              <img
+                src={currentTier.badgeUrl}
+                alt={currentTier.name}
+                className="h-9 w-9 object-contain drop-shadow"
+              />
+              <div className="text-left">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                  Level {currentTier.level}
+                </p>
+                <p className="text-xs font-black text-amber-950">{currentTier.name}</p>
+              </div>
+            </div>
+          </div>
           <h3 className="mt-4 text-xl font-bold">{displayName}</h3>
           <p className="text-sm text-zinc-500">{userName || "Team Member"}</p>
           <div className="mt-6 grid grid-cols-3 rounded-xl bg-zinc-50 p-4 text-center">
             <span>
-              <b className="block text-lg">{(balance || 0).toLocaleString()}</b>
-              <small>Lifetime</small>
+              <b className="block text-lg">{cumulative.toLocaleString()}</b>
+              <small>Cumulative</small>
             </span>
             <span>
               <b className="block text-lg">{(balance || 0).toLocaleString()}</b>
