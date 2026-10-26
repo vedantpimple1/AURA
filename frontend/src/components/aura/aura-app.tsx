@@ -1127,24 +1127,30 @@ function MemberHome({
           </div>
 
           {/* Gamified Tier Card with Circular Cosmic Badge */}
-          <div className="relative rounded-2xl border border-white/25 bg-white/15 p-5 shadow-inner backdrop-blur-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="relative h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 transition-transform duration-300 hover:scale-110">
+          <div className="relative overflow-hidden rounded-2xl border border-white/25 bg-white/15 p-5 sm:p-6 shadow-inner backdrop-blur-lg">
+            {/* Ambient Cosmic Aura Glow in background */}
+            <div className="pointer-events-none absolute -left-8 -top-8 h-48 w-48 rounded-full bg-amber-400/25 blur-2xl" />
+
+            <div className="relative z-10 flex items-start justify-between gap-4">
+              {/* Enlarged Badge covering the left corner + Label aligned at the bottom */}
+              <div className="flex items-end gap-4 sm:gap-5">
+                <div className="relative h-28 w-28 sm:h-36 sm:w-36 md:h-40 md:w-40 flex-shrink-0 transition-transform duration-300 hover:scale-105">
                   <img
                     src={currentTier.badgeUrl}
                     alt={currentTier.name}
-                    className="h-full w-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+                    className="h-full w-full object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
                   />
                 </div>
-                <div>
-                  <p className="text-[11px] font-extrabold tracking-wider text-amber-200 uppercase">
+                <div className="pb-1 sm:pb-2">
+                  <p className="text-[11px] sm:text-xs font-extrabold tracking-wider text-amber-200 uppercase">
                     CURRENT TIER · LEVEL {currentTier.level}
                   </p>
-                  <p className="text-lg sm:text-xl font-black text-white tracking-tight">{currentTier.name}</p>
+                  <p className="text-xl sm:text-2xl font-black text-white tracking-tight leading-tight">
+                    {currentTier.name}
+                  </p>
                 </div>
               </div>
-              <span className="rounded-full bg-white/20 px-2.5 py-1 text-xs font-extrabold text-white">
+              <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-extrabold text-white shadow-sm backdrop-blur-sm">
                 {progressPercent}%
               </span>
             </div>
