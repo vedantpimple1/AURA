@@ -1085,10 +1085,6 @@ function MemberHome({
               <span className="text-6xl font-black tracking-tight text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.25)] sm:text-7xl lg:text-8xl">
                 ✨ {displayCumulative.toLocaleString()}
               </span>
-              <div className="flex flex-col">
-                <span className="text-2xl font-black tracking-wide text-amber-200 sm:text-3xl">AURA</span>
-                <span className="text-xs font-semibold text-white/80">Lifetime earned across tasks & awards</span>
-              </div>
             </div>
 
             {/* Available to Spend in Store Showcase Badge */}
