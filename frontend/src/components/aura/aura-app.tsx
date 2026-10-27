@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -1437,21 +1437,51 @@ function Tasks({
     "Completed",
   ];
 
-  const displayItems: { task: any; assignmentStatus: string; assignmentId?: string }[] = admin
-    ? (initialTasks || []).flatMap((t: any) =>
-        t.assignments && t.assignments.length > 0
-          ? t.assignments.map((a: any) => ({
-              task: t,
-              assignmentStatus: a.status,
-              assignmentId: a.id,
-            }))
-          : [{ task: t, assignmentStatus: "ACTIVE", assignmentId: undefined }]
-      )
+  const rawItems = admin
+    ? (initialTasks || []).map((t: any) => {
+        const assignments = t.assignments || [];
+        let computedStatus = t.status || "ACTIVE";
+        if (assignments.length > 0) {
+          if (assignments.some((a: any) => a.status === "SUBMITTED")) {
+            computedStatus = "SUBMITTED";
+          } else if (assignments.some((a: any) => a.status === "IN_PROGRESS")) {
+            computedStatus = "IN_PROGRESS";
+          } else if (assignments.some((a: any) => a.status === "NEEDS_CHANGES")) {
+            computedStatus = "NEEDS_CHANGES";
+          } else if (assignments.every((a: any) => a.status === "COMPLETED")) {
+            computedStatus = "COMPLETED";
+          } else if (assignments.some((a: any) => a.status === "COMPLETED")) {
+            computedStatus = "IN_PROGRESS";
+          } else {
+            computedStatus = assignments[0].status || "ASSIGNED";
+          }
+        }
+        return {
+          task: t,
+          assignmentStatus: computedStatus,
+          assignments: assignments,
+          assignmentId: assignments[0]?.id,
+        };
+      })
     : (initialTasks || []).map((a: any) => ({
         task: a.task || a,
         assignmentStatus: a.status || "ASSIGNED",
+        assignments: [a],
         assignmentId: a.id,
       }));
+
+  // Deduplicate identical tasks:
+  // If multiple tasks have the exact same title, description, reward, and status (e.g. repeated test runs),
+  // only display one entry. If someone edited or changed one (different status/description/reward), it is displayed.
+  const seenTaskKeys = new Set<string>();
+  const displayItems = rawItems.filter((item) => {
+    const fingerprint = `${(item.task.title || "").trim().toLowerCase()}::${(item.task.description || "").trim()}::${item.assignmentStatus}::${item.task.baseAura || 0}`;
+    if (seenTaskKeys.has(fingerprint)) {
+      return false; // Skip identical duplicate task
+    }
+    seenTaskKeys.add(fingerprint);
+    return true;
+  });
 
   const filtered = displayItems.filter((item) => {
     const matchesFilter =
@@ -1461,7 +1491,11 @@ function Tasks({
       taskSearch.trim() === "" ||
       item.task?.title?.toLowerCase().includes(taskSearch.toLowerCase()) ||
       item.task?.description?.toLowerCase().includes(taskSearch.toLowerCase()) ||
-      item.task?.createdBy?.name?.toLowerCase().includes(taskSearch.toLowerCase());
+      item.task?.createdBy?.name?.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      item.assignments?.some((a: any) =>
+        a.user?.name?.toLowerCase().includes(taskSearch.toLowerCase()) ||
+        a.user?.email?.toLowerCase().includes(taskSearch.toLowerCase())
+      );
     return matchesFilter && matchesSearch;
   });
 
@@ -1548,6 +1582,7 @@ function Tasks({
                 <th className="px-5 py-4">Task & Details</th>
                 <th className="px-5 py-4">Aura Reward</th>
                 <th className="px-5 py-4">Status</th>
+                <th className="px-5 py-4">Assigned To</th>
                 <th className="px-5 py-4">Assigned By</th>
                 <th className="px-5 py-4 text-right">Action</th>
               </tr>
@@ -1555,7 +1590,7 @@ function Tasks({
             <tbody className="divide-y divide-zinc-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-16 text-center">
+                  <td colSpan={6} className="py-16 text-center">
                     <Target className="mx-auto mb-3 h-10 w-10 text-orange-200" />
                     <p className="font-bold text-zinc-800">No tasks found</p>
                     <p className="mt-1 text-xs text-zinc-400">
@@ -1643,7 +1678,49 @@ function Tasks({
                         </span>
                       </td>
 
-                      {/* Column 4: Creator / Assignor */}
+                      {/* Column 4: Assigned To */}
+                      <td className="whitespace-nowrap px-5 py-4 text-xs text-zinc-600">
+                        {(() => {
+                          const assignments = item.assignments || [];
+                          if (!admin) {
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700">
+                                You
+                              </span>
+                            );
+                          }
+                          if (assignments.length === 0) {
+                            return <span className="text-zinc-400 italic">Unassigned</span>;
+                          }
+                          if (assignments.length === 1) {
+                            const u = assignments[0].user;
+                            const name = u?.name || u?.email || "Teammate";
+                            const initial = (name[0] || "?").toUpperCase();
+                            return (
+                              <div className="flex items-center gap-2" title={name}>
+                                <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-orange-100 to-amber-200 text-[10px] font-bold text-orange-700">
+                                  {initial}
+                                </span>
+                                <span className="font-medium text-zinc-800 max-w-[130px] truncate">{name}</span>
+                              </div>
+                            );
+                          }
+                          const namesList = assignments
+                            .map((a: any) => a.user?.name || a.user?.email)
+                            .filter(Boolean)
+                            .join(", ");
+                          return (
+                            <div className="flex items-center gap-1.5" title={namesList}>
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/70 px-2.5 py-1 text-xs font-bold text-blue-700 shadow-2xs">
+                                <Users className="h-3 w-3 text-blue-600" />
+                                {assignments.length >= 10 ? "All Members" : `${assignments.length} Members`}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* Column 5: Creator / Assignor */}
                       <td className="whitespace-nowrap px-5 py-4 text-xs text-zinc-500">
                         {item.task.createdBy?.name ? (
                           <div className="flex items-center gap-2">
@@ -3111,6 +3188,7 @@ function CreateTaskModal({
               <label className="text-sm font-medium mb-1 block">Assign To (Optional)</label>
               <select name="assigneeId" className="w-full rounded-xl border border-zinc-200 p-2.5 text-sm outline-none focus:border-orange-500">
                 <option value="">-- Unassigned --</option>
+                <option value="__ALL__">👥 All Members</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name || u.email}

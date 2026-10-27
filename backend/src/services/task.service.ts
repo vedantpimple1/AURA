@@ -1,4 +1,4 @@
-import { prisma } from "../lib/prisma";
+﻿import { prisma } from "../lib/prisma";
 import { AuraService } from "./aura.service";
 import { NotificationService } from "./notification.service";
 
@@ -70,7 +70,7 @@ export class TaskService {
           }
         }
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 
@@ -95,7 +95,7 @@ export class TaskService {
       await NotificationService.dispatch({
         userId,
         type: 'TASK_ASSIGNED',
-        title: 'New Task Assigned 🎯',
+        title: 'New Task Assigned ðŸŽ¯',
         message: `You were assigned to "${assignment.task.title}" (+${assignment.task.baseAura} Aura reward).`,
         metadata: { taskId, assignmentId: assignment.id },
       });
@@ -104,6 +104,60 @@ export class TaskService {
     }
 
     return assignment;
+  }
+
+  // 3b. Assign task to all active users
+  static async assignTaskToAll(taskId: string, assignedById: string) {
+    if (!taskId || !assignedById) {
+      throw new Error('Task ID and Assigner ID are required');
+    }
+
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+    });
+
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    const users = await prisma.user.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, name: true, email: true },
+    });
+
+    if (users.length === 0) {
+      return [];
+    }
+
+    const assignments = await Promise.all(
+      users.map(async (user) => {
+        return await prisma.taskAssignment.create({
+          data: {
+            taskId,
+            userId: user.id,
+            assignedById,
+          },
+        });
+      })
+    );
+
+    try {
+      await Promise.all(
+        users.map((user, idx) =>
+          NotificationService.dispatch({
+            userId: user.id,
+            type: 'TASK_ASSIGNED',
+            title: 'New Task Assigned 🎯',
+            message: `You were assigned to "${task.title}" (+${task.baseAura} Aura reward).`,
+            metadata: { taskId, assignmentId: assignments[idx]?.id },
+          }).catch((e) => console.error(`Notification error for user ${user.id}:`, e))
+        )
+      );
+    } catch (e) {
+      console.error('Non-blocking notification error in assignTaskToAll:', e);
+    }
+
+    return assignments;
   }
 
   // 4. Submit task (Member)
@@ -171,7 +225,7 @@ export class TaskService {
         await NotificationService.dispatch({
           userId: submission.submittedById,
           type: "TASK_APPROVED",
-          title: "Task Approved! 🚀",
+          title: "Task Approved! ðŸš€",
           message: `Your work on "${submission.assignment.task.title}" was approved! +${submission.assignment.task.baseAura} Aura added to your balance.`,
           metadata: { taskId: submission.assignment.taskId, submissionId },
         });
@@ -190,7 +244,7 @@ export class TaskService {
         await NotificationService.dispatch({
           userId: submission.submittedById,
           type: "TASK_NEEDS_CHANGES",
-          title: "Changes Requested 📝",
+          title: "Changes Requested ðŸ“",
           message: `Feedback received on "${submission.assignment.task.title}": ${feedback || "Please review reviewer comments and resubmit."}`,
           metadata: { taskId: submission.assignment.taskId, submissionId },
         });
@@ -202,7 +256,7 @@ export class TaskService {
     return review;
   }
 
-  // 6. Delete a task (Admin-only) — cascades to assignments via Prisma schema
+  // 6. Delete a task (Admin-only) â€” cascades to assignments via Prisma schema
   static async deleteTask(taskId: string) {
     if (!taskId) throw new Error('Task ID is required');
 

@@ -11,7 +11,9 @@ export async function createTaskAction(formData: FormData) {
   const title = formData.get('title') as string;
   const description = (formData.get('description') as string) || '';
   const baseAura = parseInt(formData.get('baseAura') as string, 10);
-  const assigneeId = (formData.get('assigneeId') as string) || undefined;
+  const rawAssignee = (formData.get('assigneeId') as string) || '';
+  const assignToAll = rawAssignee === '__ALL__';
+  const assigneeId = (!assignToAll && rawAssignee) ? rawAssignee : undefined;
   const deadline = (formData.get('deadline') as string) || undefined;
 
   const res = await apiClient.post('/tasks', {
@@ -19,6 +21,7 @@ export async function createTaskAction(formData: FormData) {
     description,
     baseAura,
     assigneeId,
+    assignToAll,
     deadline,
   });
 

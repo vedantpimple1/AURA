@@ -24,15 +24,17 @@ taskRouter.get('/', requireAuth, async (req: Request, res: Response): Promise<vo
 /**
  * POST /api/tasks
  * Creates a new task and optionally assigns it. Requires ADMIN or SUPERADMIN.
+ * Supports assignToAll flag to assign the task to all users.
  */
 taskRouter.post('/', requireRole('ADMIN', 'SUPERADMIN'), async (req: Request, res: Response): Promise<void> => {
   try {
     const session = req.session!;
-    const { title, description, baseAura, assigneeId, deadline } = req.body as {
+    const { title, description, baseAura, assigneeId, assignToAll, deadline } = req.body as {
       title?: string;
       description?: string;
       baseAura?: number;
       assigneeId?: string;
+      assignToAll?: boolean;
       deadline?: string;
     };
 
@@ -49,7 +51,9 @@ taskRouter.post('/', requireRole('ADMIN', 'SUPERADMIN'), async (req: Request, re
       deadline: deadline ? new Date(deadline) : undefined,
     });
 
-    if (assigneeId) {
+    if (assignToAll) {
+      await TaskService.assignTaskToAll(task.id, session.userId);
+    } else if (assigneeId) {
       await TaskService.assignTask(task.id, assigneeId, session.userId);
     }
 
