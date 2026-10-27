@@ -107,7 +107,7 @@ export default async function Home({
   return (
     <AuraApp
       initialRole={primaryRole}
-      userName={session.email}
+      userName={(Array.isArray(realUsers) ? realUsers.find((u: any) => u.email === session!.email)?.name : undefined) || session!.email}
       initialUsers={realUsers}
       initialAuraBalance={initialAuraBalance}
       initialCumulativeAura={initialCumulativeAura}

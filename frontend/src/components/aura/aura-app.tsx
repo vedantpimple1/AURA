@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Wall } from "@/components/aura/Wall";
 import { logoutAction } from "@/actions/auth.actions";
 import { createUserAction } from "@/actions/user.actions";
 import { awardAuraAction, getAuraBalanceAction, getCumulativeAuraAction } from "@/actions/aura.actions";
@@ -392,14 +393,7 @@ export function AuraApp({
         </nav>
       </aside>
 
-      {/* Floating Streak Element */}
-      <div className="fixed bottom-4 right-4 z-20 w-56 rounded-xl bg-gradient-to-br from-orange-600 to-amber-700 p-3 text-white shadow-xl pointer-events-none hidden sm:block">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4" />
-          <b className="text-[11px] uppercase tracking-wider">Keep your streak alive</b>
-        </div>
-        <p className="mt-1 text-[10px] text-orange-100 leading-tight">One more task this week unlocks a bonus badge.</p>
-      </div>
+
 
       {/* Main Container */}
       <div className={cn("transition-all duration-300", isSidebarOpen ? "lg:pl-64" : "lg:pl-20")}>
@@ -410,24 +404,7 @@ export function AuraApp({
           </div>
           <h1 className="hidden font-bold lg:block">{nav.find((x) => x[0] === page)?.[1]}</h1>
           <div className="flex items-center gap-3">
-            {/* Top Member Balance Badge */}
-            {role === "Member" && (
-              <button
-                onClick={() => setPage("history")}
-                className="group relative flex items-center gap-2 rounded-xl border border-amber-300/80 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-sm transition hover:scale-105 hover:border-amber-400"
-                title="Your available Aura balance — click to view history"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
-                </span>
-                <span className="text-sm">✨</span>
-                <span className="font-extrabold text-orange-950 tracking-tight">
-                  {(auraBalance ?? 0).toLocaleString()}
-                </span>
-                <span className="hidden font-semibold text-orange-800/90 sm:inline">Aura</span>
-              </button>
-            )}
+
 
             {/* Interactive Search Bar */}
             <div className="relative hidden sm:block">
@@ -729,6 +706,7 @@ export function AuraApp({
               notify={notify}
               kudos={initialKudos}
               openSendKudos={() => setShowSendKudos(true)}
+              initialTasks={initialTasks}
             />
           )}
           {page === "store" && (
@@ -1016,7 +994,15 @@ function MemberHome({
   userName?: string;
   topTeam?: any;
 }) {
-  const displayName = userName ? (userName.includes("@") ? userName.split("@")[0] : userName) : "✨";
+  const displayName = (() => {
+    // Prefer the full name from the user record (e.g. "Aarav Sharma" → "Aarav")
+    if (userName && !userName.includes("@")) {
+      return userName.split(" ")[0];
+    }
+    // Fall back: strip email domain then take first word
+    const base = (userName?.split("@")[0] ?? "✨").replace(/\d+$/g, "");
+    return base.split(/[\s._-]/)[0];
+  })();
 
   const displayCumulative = cumulativeAura ?? balance ?? 0;
   const displayAvailable = availableAura ?? balance ?? 0;
@@ -2151,9 +2137,10 @@ function Leaderboard() {
 }
 
 // Database-backed Aura Wall Component
-function Wall({
+function LegacyWall({
   notify,
   kudos,
+  openSendKudos,
 }: {
   notify: (s: string) => void;
   kudos?: any[];
