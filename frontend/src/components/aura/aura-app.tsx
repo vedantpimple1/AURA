@@ -37,6 +37,8 @@ import {
   ChevronLeft,
   Eye,
   RefreshCw,
+  Lock,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -107,33 +109,7 @@ export function getTierForAura(points: number = 0): AuraTier {
   return AURA_TIERS.find((t) => pts >= t.min && pts < t.max) || AURA_TIERS[AURA_TIERS.length - 1];
 }
 
-let members = [
-  "Aarav Sharma",
-  "Maya Patel",
-  "Noah Williams",
-  "Olivia Chen",
-  "Kabir Singh",
-  "Emma Davis",
-  "Rohan Mehta",
-  "Sophia Martin",
-  "Ishaan Gupta",
-  "Mia Wilson",
-  "Arjun Kapoor",
-  "Ava Brown",
-  "Vihaan Rao",
-  "Charlotte Lee",
-  "Dev Malhotra",
-  "Amelia Clark",
-  "Neil Verma",
-  "Isla Thomas",
-  "Kunal Shah",
-  "Grace Hall",
-  "Aditya Joshi",
-  "Lily Moore",
-  "Samar Bansal",
-  "Ella Young",
-  "Reyansh Jain",
-];
+let members: string[] = [];
 
 const batch = { name: "KAI AI Team", year: "Batch 2026", initials: "KAI" };
 
@@ -208,9 +184,9 @@ export function AuraApp({
   initialTab?: string;
 }) {
   if (initialUsers && initialUsers.length > 0) {
-    const realNames = initialUsers.map((u) => u.name || u.email);
-    const combined = [...realNames, ...members];
-    members = Array.from(new Set(combined)).slice(0, 25);
+    members = initialUsers.map((u: any) => u.name || u.email);
+  } else {
+    members = [];
   }
 
   const currentUser = initialUsers?.find((u) => u.email === userName) || null;
@@ -698,9 +674,9 @@ export function AuraApp({
           )}
           {page === "reviews" && <Reviews notify={notify} initialTasks={initialTasks} />}
           {page === "members" && (
-            <Members notify={notify} openAddUser={() => setShowAddUser(true)} />
+            <Members notify={notify} openAddUser={() => setShowAddUser(true)} users={initialUsers} />
           )}
-          {page === "leaderboard" && <Leaderboard />}
+          {page === "leaderboard" && <Leaderboard users={initialUsers} />}
           {page === "wall" && (
             <Wall
               notify={notify}
@@ -1220,7 +1196,7 @@ function AdminHome({
 }) {
   const stat = superadmin
     ? [
-        ["Team members", "25", Users],
+        ["Team members", `${members.length || 0}`, Users],
         ["Pending approvals", "3", Clock3],
         ["Aura issued", "18,640", Sparkles],
         ["Aura redeemed", "6,220", Gift],
@@ -1364,30 +1340,44 @@ function TaskList({ open, initialTasks }: { open: (t: any) => void; initialTasks
 }
 
 function Feed() {
+  const displayFeed = members.slice(0, 3);
   return (
     <Card className="p-5">
       <b>Recent Aura Wall activity</b>
-      {members.slice(1, 4).map((m, i) => (
-        <div className="mt-4 flex gap-3" key={m}>
-          <Avatar name={m} />
-          <p className="text-sm text-zinc-600">
-            <b className="text-zinc-900">{m}</b>{" "}
-            {i === 0
-              ? "completed Product story mapping"
-              : i === 1
-              ? "unlocked the Cosmic Rookie badge"
-              : "reacted with 🔥 Crushing It to Kabir"}
-            <small className="block text-zinc-400">2 hours ago</small>
-          </p>
-        </div>
-      ))}
+      {displayFeed.length === 0 ? (
+        <p className="mt-4 text-xs text-zinc-400">No recent activity.</p>
+      ) : (
+        displayFeed.map((m) => (
+          <div className="mt-4 flex gap-3" key={m}>
+            <Avatar name={m} />
+            <p className="text-sm text-zinc-600">
+              <b className="text-zinc-900">{m}</b> active on Aura
+              <small className="block text-zinc-400">Recently</small>
+            </p>
+          </div>
+        ))
+      )}
     </Card>
   );
 }
 
 function TagCard({ topTeam }: { topTeam?: any }) {
-  const name = topTeam?.name || "Momentum Makers";
-  const aura = topTeam?.combinedAura !== undefined ? `${topTeam.combinedAura} Aura` : "510 Aura";
+  if (!topTeam) {
+    return (
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-br from-amber-50 to-white p-5">
+          <Users className="h-5 w-5 text-amber-600" />
+          <p className="mt-4 text-xs font-bold text-amber-700">TAG TEAM · WEEKLY COMPETITION</p>
+          <b className="text-lg">No active teams yet</b>
+          <p className="mt-2 text-xs text-zinc-500">
+            Create squads in the Tag Teams tab to compete together!
+          </p>
+        </div>
+      </Card>
+    );
+  }
+  const name = topTeam.name;
+  const aura = `${topTeam.combinedAura || 0} Aura`;
 
   return (
     <Card className="overflow-hidden">
@@ -1776,9 +1766,38 @@ function TaskModal({
   role: string;
 }) {
   const [loading, setLoading] = useState(false);
+  const [reviewFeedback, setReviewFeedback] = useState<Record<string, string>>({});
+  const [showReviewInput, setShowReviewInput] = useState<Record<string, boolean>>({});
+
   const isAdmin = role === "Admin" || role === "Superadmin";
+  const isSuperadmin = role.toUpperCase() === "SUPERADMIN";
+
   const theTask = task.task || task;
   const assignmentId = task.task ? task.id : task.assignments?.[0]?.id;
+
+  // Rule 1: Admin should not delete tasks created by Superadmin. Superadmin can delete any task.
+  const creatorRoles = theTask?.createdBy?.roles?.map((r: any) => (r.role?.name || r.name)?.toUpperCase()) || [];
+  const isCreatorSuperadmin =
+    creatorRoles.includes("SUPERADMIN") ||
+    theTask?.createdBy?.name?.toLowerCase().includes("superadmin") ||
+    theTask?.createdBy?.email?.toLowerCase().includes("superadmin");
+
+  const canDelete = isSuperadmin || !isCreatorSuperadmin;
+
+  // Member's latest submission & review details (when viewing as Member)
+  const memberSubmissions = task.submissions || [];
+  const latestSubmission = memberSubmissions[0];
+  const latestReview = latestSubmission?.reviews?.[0];
+
+  // Admin view: all submissions across assignments
+  const adminSubmissions = (theTask?.assignments || []).flatMap((a: any) =>
+    (a.submissions || []).map((s: any) => ({
+      ...s,
+      assignmentId: a.id,
+      assignmentStatus: a.status,
+      member: a.user,
+    }))
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1791,7 +1810,7 @@ function TaskModal({
     fd.append("assignmentId", assignmentId);
     const res = await submitTaskAction(fd);
     if (res.success) {
-      notify("Task submitted successfully!");
+      notify(task.status === "NEEDS_CHANGES" ? "Revisions submitted successfully for review!" : "Task submitted successfully for review!");
       onSuccess();
     } else {
       notify((res as any).error || "Failed to submit task");
@@ -1800,6 +1819,10 @@ function TaskModal({
   }
 
   async function handleDelete() {
+    if (!canDelete) {
+      notify("Admins cannot delete tasks created by Superadmin.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this task? This cannot be undone.")) return;
     setLoading(true);
     const fd = new FormData();
@@ -1810,6 +1833,28 @@ function TaskModal({
       onSuccess();
     } else {
       notify((res as any).error || "Failed to delete task");
+      setLoading(false);
+    }
+  }
+
+  async function handleAdminReview(submissionId: string, status: "APPROVED" | "NEEDS_CHANGES") {
+    const feedback = reviewFeedback[submissionId] || "";
+    if (status === "NEEDS_CHANGES" && !feedback.trim()) {
+      notify("Please provide feedback explaining the changes required.");
+      return;
+    }
+    setLoading(true);
+    notify(status === "APPROVED" ? "Approving task..." : "Requesting changes...");
+    const fd = new FormData();
+    fd.append("submissionId", submissionId);
+    fd.append("status", status);
+    fd.append("feedback", feedback);
+    const res = await reviewTaskAction(fd);
+    if (res.success) {
+      notify(status === "APPROVED" ? "Task approved and Aura awarded!" : "Changes requested. Member notified.");
+      onSuccess();
+    } else {
+      notify((res as any).error || "Failed to review submission");
       setLoading(false);
     }
   }
@@ -1834,86 +1879,310 @@ function TaskModal({
   }
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-end bg-zinc-900/30 sm:place-items-center">
-      <Card className="w-full max-w-xl rounded-b-none p-6 sm:rounded-3xl">
-        <div className="flex justify-between">
+    <div className="fixed inset-0 z-30 grid place-items-end bg-zinc-900/30 sm:place-items-center p-0 sm:p-4 overflow-y-auto">
+      <Card className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-b-none p-6 sm:rounded-3xl shadow-2xl">
+        <div className="flex justify-between items-center">
           <Pill>{task.status || "ACTIVE"}</Pill>
-          <button onClick={close}>
+          <button onClick={close} className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <h2 className="mt-5 text-2xl font-bold">{theTask?.title || "Task"}</h2>
-        <p className="mt-3 leading-7 text-zinc-500">
+
+        <h2 className="mt-4 text-2xl font-bold text-zinc-900">{theTask?.title || "Task"}</h2>
+        <p className="mt-2 text-sm leading-6 text-zinc-600 whitespace-pre-wrap">
           {theTask?.description || "No description provided."}
         </p>
-        <div className="mt-5 grid grid-cols-2 rounded-xl bg-zinc-50 p-4 text-center text-sm">
-          <span>
-            {theTask?.baseAura || 0}
-            <small className="block text-zinc-500">Aura</small>
-          </span>
-          <span>
-            Creator
-            <small className="block text-zinc-500">
-              {theTask?.createdBy?.name || "Admin"}
-            </small>
-          </span>
-        </div>
-        {isAdmin && assignmentId && (
-          <div className="mt-5 rounded-xl border border-zinc-200 p-4">
-            <h4 className="mb-3 text-sm font-bold">Admin Actions</h4>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleStatusUpdate("COMPLETED")}
-                disabled={loading}
-              >
-                Mark Completed
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleStatusUpdate("NEEDS_CHANGES")}
-                disabled={loading}
-              >
-                Mark Incomplete
-              </Button>
-            </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-zinc-50 border border-zinc-100 p-3.5 text-center text-sm">
+          <div>
+            <span className="font-bold text-orange-600 text-base">+{theTask?.baseAura || 0}</span>
+            <small className="block text-zinc-400 text-xs">Aura Reward</small>
           </div>
-        )}
-        
-        {isAdmin && (
-          <div className="mt-4 flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDelete}
-              disabled={loading}
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-            >
-              Delete Task
-            </Button>
+          <div>
+            <span className="font-medium text-zinc-800 text-sm">
+              {theTask?.createdBy?.name || "Admin"}
+              {isCreatorSuperadmin && (
+                <span className="ml-1.5 text-[10px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-full">
+                  Superadmin
+                </span>
+              )}
+            </span>
+            <small className="block text-zinc-400 text-xs">Created By</small>
+          </div>
+        </div>
+
+        {/* Member View: Submission Status & Change Request Flow */}
+        {!isAdmin && (
+          <div className="mt-4 space-y-3">
+            {task.status === "NEEDS_CHANGES" && (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-4 text-amber-950">
+                <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  Changes Requested on Your Submission
+                </div>
+                {latestReview?.feedback ? (
+                  <div className="mt-2.5 rounded-xl border border-amber-200 bg-white/90 p-3 text-sm font-medium text-amber-950 leading-relaxed shadow-sm">
+                    "{latestReview.feedback}"
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-amber-800">
+                    The reviewer requested changes. Please revise and resubmit your work.
+                  </p>
+                )}
+                {latestSubmission?.content && (
+                  <div className="mt-2.5 rounded-lg bg-amber-100/50 p-2.5 text-xs text-amber-900">
+                    <span className="font-semibold block text-amber-950 mb-0.5">Your previous submission:</span>
+                    {latestSubmission.content}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {task.status === "SUBMITTED" && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/80 p-4 text-blue-950">
+                <div className="flex items-center gap-2 font-bold text-blue-900 text-sm">
+                  <Clock3 className="h-4 w-4 text-blue-600" />
+                  Work Submitted — Awaiting Review
+                </div>
+                {latestSubmission?.content && (
+                  <div className="mt-2.5 rounded-xl border border-blue-100 bg-white/90 p-3 text-xs text-blue-900 shadow-sm leading-relaxed">
+                    <span className="font-semibold block text-blue-950 mb-0.5">Submitted Work:</span>
+                    {latestSubmission.content}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {task.status === "COMPLETED" && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-emerald-950">
+                <div className="flex items-center gap-2 font-bold text-emerald-900 text-sm">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  Task Completed & Approved (+{theTask?.baseAura || 0} Aura)
+                </div>
+                {latestSubmission?.content && (
+                  <div className="mt-2.5 rounded-xl border border-emerald-100 bg-white/90 p-3 text-xs text-emerald-900 shadow-sm leading-relaxed">
+                    <span className="font-semibold block text-emerald-950 mb-0.5">Approved Work:</span>
+                    {latestSubmission.content}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Submission Form for Member (when Assigned, In Progress, or Needs Changes) */}
+            {(task.status === "ASSIGNED" || task.status === "IN_PROGRESS" || task.status === "NEEDS_CHANGES") && (
+              <form onSubmit={handleSubmit} className="mt-4">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 mb-1.5">
+                  {task.status === "NEEDS_CHANGES" ? "Resubmit Your Work / Revisions:" : "Submit Work for Review:"}
+                </label>
+                <textarea
+                  required
+                  name="content"
+                  className="w-full rounded-2xl border border-zinc-200 p-3.5 text-sm focus:border-orange-500 focus:outline-none transition leading-relaxed"
+                  placeholder={
+                    task.status === "NEEDS_CHANGES"
+                      ? "Explain what you revised, link to updated PR, new screenshot..."
+                      : "Submission notes, links to PR, artifacts, design URL..."
+                  }
+                  rows={3}
+                />
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button variant="outline" type="button" onClick={close}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading} className="bg-orange-600 hover:bg-orange-700 text-white">
+                    {loading
+                      ? "Submitting..."
+                      : task.status === "NEEDS_CHANGES"
+                      ? "Resubmit Task"
+                      : "Submit for Review"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         )}
 
-        {!isAdmin && (task.status === "ASSIGNED" || task.status === "IN_PROGRESS" || task.status === "NEEDS_CHANGES") && (
-          <form onSubmit={handleSubmit} className="mt-5">
-            <textarea
-              required
-              name="content"
-              className="w-full rounded-xl border p-4 text-sm"
-              placeholder="Submission notes, link to PR, design URL..."
-              rows={3}
-            />
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" type="button" onClick={close}>
-                Cancel
+        {/* Admin View: Submissions & Work Inspection */}
+        {isAdmin && (
+          <div className="mt-5 space-y-4">
+            {adminSubmissions.length > 0 ? (
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                    <FileText className="h-4 w-4 text-orange-600" />
+                    Submitted Work ({adminSubmissions.length})
+                  </h4>
+                </div>
+
+                <div className="space-y-3">
+                  {adminSubmissions.map((sub: any) => (
+                    <div key={sub.id} className="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-zinc-900">
+                          {sub.member?.name || sub.member?.email || "Member"}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {sub.version > 1 && (
+                            <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                              v{sub.version} Resubmission
+                            </span>
+                          )}
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                              sub.assignmentStatus === "COMPLETED"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : sub.assignmentStatus === "NEEDS_CHANGES"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-blue-100 text-blue-700"
+                            )}
+                          >
+                            {sub.assignmentStatus}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Content of task submitted */}
+                      <div className="rounded-lg bg-zinc-50 border border-zinc-100 p-2.5 text-xs text-zinc-800 whitespace-pre-wrap break-words leading-relaxed">
+                        <span className="font-bold text-zinc-500 block text-[10px] uppercase mb-1">Content / What User Did:</span>
+                        {sub.content || "No submission text provided."}
+                      </div>
+
+                      {/* Previous Review Feedback */}
+                      {sub.reviews?.[0] && (
+                        <div className="rounded-lg bg-amber-50/70 border border-amber-100 p-2 text-xs text-amber-900">
+                          <span className="font-semibold">Latest Review ({sub.reviews[0].status}):</span>{" "}
+                          {sub.reviews[0].feedback || "No comment"}
+                        </div>
+                      )}
+
+                      {/* Review Actions if Pending */}
+                      {sub.assignmentStatus === "SUBMITTED" && (
+                        <div className="pt-2 border-t border-zinc-100 space-y-2">
+                          {showReviewInput[sub.id] ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={reviewFeedback[sub.id] || ""}
+                                onChange={(e) =>
+                                  setReviewFeedback((prev) => ({ ...prev, [sub.id]: e.target.value }))
+                                }
+                                placeholder="Feedback for member (required for requesting changes)..."
+                                className="w-full rounded-xl border border-zinc-200 px-3 py-1.5 text-xs focus:outline-none focus:border-orange-500"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    setShowReviewInput((prev) => ({ ...prev, [sub.id]: false }))
+                                  }
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={loading}
+                                  onClick={() => handleAdminReview(sub.id, "NEEDS_CHANGES")}
+                                  className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                                >
+                                  Submit Change Request
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  disabled={loading}
+                                  onClick={() => handleAdminReview(sub.id, "APPROVED")}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                  Approve & Award
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setShowReviewInput((prev) => ({ ...prev, [sub.id]: true }))
+                                }
+                                className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                              >
+                                Request Changes
+                              </Button>
+                              <Button
+                                size="sm"
+                                disabled={loading}
+                                onClick={() => handleAdminReview(sub.id, "APPROVED")}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                              >
+                                Approve Work
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
+                No submissions received yet for this task.
+              </div>
+            )}
+
+            {/* Quick Status Override */}
+            {assignmentId && (
+              <div className="rounded-2xl border border-zinc-200 p-3.5">
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-600">Manual Status Override</h4>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStatusUpdate("COMPLETED")}
+                    disabled={loading}
+                  >
+                    Mark Completed
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStatusUpdate("NEEDS_CHANGES")}
+                    disabled={loading}
+                  >
+                    Mark Incomplete
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Task Deletion Area: Enforce Admin vs Superadmin Permission Rule */}
+        {isAdmin && (
+          <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4">
+            {canDelete ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDelete}
+                disabled={loading}
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                Delete Task
               </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Submitting..." : "Submit for Review"}
-              </Button>
-            </div>
-          </form>
+            ) : (
+              <div className="flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-500">
+                <Lock className="h-3.5 w-3.5 text-zinc-400" />
+                <span>Protected: Created by Superadmin (Only Superadmin can delete)</span>
+              </div>
+            )}
+            <Button variant="outline" size="sm" onClick={close} className="text-xs text-zinc-500 hover:text-zinc-700">
+              Close
+            </Button>
+          </div>
         )}
       </Card>
     </div>
@@ -2044,7 +2313,7 @@ function ChampionConfetti() {
   );
 }
 
-function Leaderboard() {
+function Leaderboard({ users = [] }: { users?: any[] }) {
   const top = members.slice(0, 3);
   // top[0] is 1st Place, top[1] is 2nd Place, top[2] is 3rd Place
 
@@ -2182,7 +2451,7 @@ function Leaderboard() {
         <div className="border-b border-zinc-100 bg-zinc-50/50 px-5 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">
           All Participants & Standings
         </div>
-        {members.slice(3, 15).map((m, i) => {
+        {members.slice(3).map((m, i) => {
           const rank = i + 4;
           const own = m === "Aarav Sharma";
           const points = (10 - i) * 1000;
@@ -2729,69 +2998,275 @@ function Reviews({
   notify: (s: string) => void;
   initialTasks?: any[];
 }) {
-  async function handleApprove(submissionId: string) {
+  const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleApprove(submissionId: string, feedback?: string) {
+    setLoading(true);
     notify("Approving...");
     const fd = new FormData();
     fd.append("submissionId", submissionId);
     fd.append("status", "APPROVED");
+    if (feedback) fd.append("feedback", feedback);
     const res = await reviewTaskAction(fd);
     if (res.success) {
       notify("Task approved and Aura awarded!");
-      setTimeout(() => window.location.reload(), 1000);
+      setSelectedSubmission(null);
+      setFeedbackText("");
+      setTimeout(() => window.location.reload(), 800);
     } else {
       notify((res as any).error || "Failed to approve");
+      setLoading(false);
+    }
+  }
+
+  async function handleRequestChanges(submissionId: string) {
+    if (!feedbackText.trim()) {
+      notify("Please provide feedback explaining the changes required.");
+      return;
+    }
+    setLoading(true);
+    notify("Requesting changes...");
+    const fd = new FormData();
+    fd.append("submissionId", submissionId);
+    fd.append("status", "NEEDS_CHANGES");
+    fd.append("feedback", feedbackText.trim());
+    const res = await reviewTaskAction(fd);
+    if (res.success) {
+      notify("Changes requested. Notification dispatched to member.");
+      setSelectedSubmission(null);
+      setFeedbackText("");
+      setTimeout(() => window.location.reload(), 800);
+    } else {
+      notify((res as any).error || "Failed to request changes");
+      setLoading(false);
     }
   }
 
   const pendingAssignments = (initialTasks || []).flatMap((t: any) =>
     (t.assignments || [])
       .filter((a: any) => a.status === "SUBMITTED" && a.submissions?.length > 0)
-      .map((a: any) => ({ ...a, taskTitle: t.title, taskAura: t.baseAura }))
+      .map((a: any) => ({
+        ...a,
+        taskTitle: t.title,
+        taskDescription: t.description,
+        taskAura: t.baseAura,
+      }))
   );
 
   return (
     <>
       <Head
         title="Review portal"
-        copy="A focused queue for reviewing the team's submitted work."
+        copy="Inspect submitted member work, provide review feedback, request changes, or approve tasks."
       />
-      <Card className="overflow-auto">
-        <div className="hidden min-w-[720px] grid-cols-[1.1fr_1.8fr_1fr_.8fr_1fr_.7fr] gap-4 border-b bg-orange-50/50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-zinc-500 md:grid">
+      <Card className="overflow-auto shadow-sm">
+        <div className="hidden min-w-[760px] grid-cols-[1.1fr_1.8fr_1fr_.8fr_1fr_1.2fr] gap-4 border-b bg-orange-50/50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-zinc-500 md:grid">
           <span>Member</span>
-          <span>Task</span>
+          <span>Task & Submission</span>
           <span>Submitted</span>
           <span>Aura</span>
           <span>Status</span>
           <span>Action</span>
         </div>
         {pendingAssignments.length === 0 ? (
-          <div className="p-8 text-center text-zinc-500">No submissions awaiting review.</div>
+          <div className="p-12 text-center text-zinc-400">
+            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400 mb-2 opacity-80" />
+            <p className="font-medium text-sm text-zinc-600">All caught up!</p>
+            <p className="text-xs text-zinc-400 mt-1">No submissions currently awaiting review.</p>
+          </div>
         ) : (
           pendingAssignments.map((a: any) => (
             <div
-              className="grid gap-3 border-b p-4 last:border-0 md:grid-cols-[1.1fr_1.8fr_1fr_.8fr_1fr_.7fr] md:items-center md:px-5"
+              className="grid gap-3 border-b p-4 last:border-0 md:grid-cols-[1.1fr_1.8fr_1fr_.8fr_1fr_1.2fr] md:items-center md:px-5 hover:bg-orange-50/20 transition"
               key={a.id}
             >
-              <span className="flex items-center gap-2">
+              <span className="flex items-center gap-2.5">
                 <Avatar name={a.user?.name || "?"} />
-                <b className="text-sm">{a.user?.name || "Unknown"}</b>
+                <div>
+                  <b className="text-sm block text-zinc-900">{a.user?.name || "Unknown"}</b>
+                  <small className="text-zinc-400 text-xs">{a.user?.email}</small>
+                </div>
               </span>
-              <span>
-                <b className="block text-sm">{a.taskTitle}</b>
-                <small className="text-zinc-500">Submitted for review</small>
-              </span>
-              <small>
-                {new Date(a.submissions[0].submittedAt || Date.now()).toLocaleDateString()}
+
+              <div>
+                <b className="block text-sm text-zinc-900">{a.taskTitle}</b>
+                {/* Content preview so admin sees what user submitted */}
+                <p className="text-xs text-zinc-600 line-clamp-1 mt-0.5 font-mono bg-zinc-50 border border-zinc-200 rounded px-2 py-0.5 inline-block max-w-full">
+                  {a.submissions[0]?.content || "No content provided"}
+                </p>
+                {a.submissions[0]?.version > 1 && (
+                  <span className="ml-2 text-[10px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded">
+                    Resubmission
+                  </span>
+                )}
+              </div>
+
+              <small className="text-zinc-500">
+                {new Date(a.submissions[0].submittedAt || Date.now()).toLocaleDateString([], {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </small>
-              <b className="text-orange-600">{a.taskAura} Aura</b>
+
+              <b className="text-orange-600 font-bold">+{a.taskAura} Aura</b>
               <Pill>Pending Review</Pill>
-              <Button size="sm" onClick={() => handleApprove(a.submissions[0].id)}>
-                Approve
-              </Button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedSubmission(a);
+                    setFeedbackText("");
+                  }}
+                  className="text-xs font-semibold"
+                >
+                  <Eye className="mr-1 h-3.5 w-3.5" />
+                  View & Review
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleApprove(a.submissions[0].id)}
+                  disabled={loading}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                >
+                  Approve
+                </Button>
+              </div>
             </div>
           ))
         )}
       </Card>
+
+      {/* Review Submission Inspection Modal */}
+      {selectedSubmission && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-zinc-900/40 p-4 backdrop-blur-sm overflow-y-auto">
+          <Card className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-start border-b border-zinc-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Pill>Pending Review</Pill>
+                  {selectedSubmission.submissions[0]?.version > 1 && (
+                    <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full">
+                      Version {selectedSubmission.submissions[0].version} (Resubmitted)
+                    </span>
+                  )}
+                </div>
+                <h3 className="mt-2 text-xl font-bold text-zinc-900">
+                  {selectedSubmission.taskTitle}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedSubmission(null)}
+                className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Task Info */}
+            <div className="rounded-2xl bg-zinc-50 border border-zinc-100 p-3.5 text-xs text-zinc-600 space-y-1">
+              <div>
+                <span className="font-semibold text-zinc-700">Task Description: </span>
+                {selectedSubmission.taskDescription || "No description provided."}
+              </div>
+              <div>
+                <span className="font-semibold text-zinc-700">Reward: </span>
+                <span className="font-bold text-orange-600">+{selectedSubmission.taskAura} Aura</span>
+              </div>
+            </div>
+
+            {/* Submitter Info */}
+            <div className="flex items-center gap-3 rounded-2xl border border-zinc-100 bg-white p-3">
+              <Avatar name={selectedSubmission.user?.name || "?"} />
+              <div className="flex-1">
+                <div className="text-sm font-bold text-zinc-900">
+                  {selectedSubmission.user?.name || "Unknown Member"}
+                </div>
+                <div className="text-xs text-zinc-400">{selectedSubmission.user?.email}</div>
+              </div>
+              <div className="text-right text-xs text-zinc-400">
+                Submitted on
+                <div className="font-medium text-zinc-600">
+                  {new Date(selectedSubmission.submissions[0]?.submittedAt || Date.now()).toLocaleDateString([], {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Exact Submission Content / What user did */}
+            <div className="rounded-2xl border border-orange-200 bg-orange-50/40 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-orange-950 flex items-center gap-1.5">
+                  <FileText className="h-4 w-4 text-orange-600" />
+                  Submitted Work & Content
+                </span>
+              </div>
+              <div className="rounded-xl bg-white border border-orange-100 p-4 text-sm text-zinc-900 whitespace-pre-wrap break-words leading-relaxed shadow-sm font-sans">
+                {selectedSubmission.submissions[0]?.content || "No submission text provided."}
+              </div>
+            </div>
+
+            {/* Previous Review Feedback (if any) */}
+            {selectedSubmission.submissions[0]?.reviews?.[0] && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                <span className="font-bold text-amber-900">Previous Review Feedback: </span>
+                {selectedSubmission.submissions[0].reviews[0].feedback || "None recorded."}
+              </div>
+            )}
+
+            {/* Review Decision & Feedback Area */}
+            <div className="space-y-2 pt-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
+                Reviewer Feedback & Notes
+              </label>
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Explain what changes are needed (required when requesting changes) or leave approval comments..."
+                rows={3}
+                className="w-full rounded-2xl border border-zinc-200 p-3.5 text-sm focus:border-orange-500 focus:outline-none leading-relaxed"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-zinc-100">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setSelectedSubmission(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                type="button"
+                disabled={loading}
+                onClick={() => handleRequestChanges(selectedSubmission.submissions[0].id)}
+                className="border-amber-400 text-amber-700 hover:bg-amber-50"
+              >
+                {loading ? "Updating..." : "Request Changes"}
+              </Button>
+              <Button
+                type="button"
+                disabled={loading}
+                onClick={() => handleApprove(selectedSubmission.submissions[0].id, feedbackText)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {loading ? "Approving..." : `Approve (+${selectedSubmission.taskAura} Aura)`}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
@@ -2799,15 +3274,19 @@ function Reviews({
 function Members({
   notify,
   openAddUser,
+  users = [],
 }: {
   notify: (s: string) => void;
   openAddUser: () => void;
+  users?: any[];
 }) {
+  const displayList = users && users.length > 0 ? users : [];
+
   return (
     <>
       <Head
         title="Members"
-        copy="25 people building momentum together."
+        copy={`${displayList.length} ${displayList.length === 1 ? "person" : "people"} building momentum together.`}
         action={
           <Button onClick={openAddUser}>
             <Plus className="mr-2 h-4 w-4" />
@@ -2816,20 +3295,24 @@ function Members({
         }
       />
       <div className="grid gap-3 md:hidden">
-        {members.slice(0, 8).map((m, i) => (
-          <Card className="p-4" key={m}>
-            <div className="flex gap-3">
-              <Avatar name={m} />
-              <span className="flex-1">
-                <b>{m}</b>
-                <small className="block text-zinc-500">
-                  {i === 0 ? "Superadmin" : i < 3 ? "Admin" : "Member"} · Active
-                </small>
-              </span>
-              <Pill>{980 - i * 50} Aura</Pill>
-            </div>
-          </Card>
-        ))}
+        {displayList.map((u: any) => {
+          const name = u.name || u.email || "Member";
+          const roleName = u.roles?.map((r: any) => r.role?.name || r.name).join(", ") || (u.role || "Member");
+          return (
+            <Card className="p-4" key={u.id || u.email}>
+              <div className="flex gap-3">
+                <Avatar name={name} />
+                <span className="flex-1">
+                  <b>{name}</b>
+                  <small className="block text-zinc-500">
+                    {roleName} · {u.status || "Active"}
+                  </small>
+                </span>
+                <span className="text-xs text-zinc-400">{u.email}</span>
+              </div>
+            </Card>
+          );
+        })}
       </div>
       <Card className="hidden overflow-auto md:block">
         <table className="w-full min-w-[760px] text-left text-sm">
@@ -2837,13 +3320,10 @@ function Members({
             <tr>
               {[
                 "Member",
+                "Email",
                 "Role",
                 "Status",
-                "Last login",
-                "Last task",
-                "Lifetime Aura",
-                "Monthly Aura",
-                "Available",
+                "Joined",
               ].map((x) => (
                 <th className="p-4" key={x}>
                   {x}
@@ -2852,25 +3332,39 @@ function Members({
             </tr>
           </thead>
           <tbody>
-            {members.slice(0, 10).map((m, i) => (
-              <tr className="border-t" key={m}>
-                <td className="p-4">
-                  <span className="flex items-center gap-3">
-                    <Avatar name={m} />
-                    <b>{m}</b>
-                  </span>
+            {displayList.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-zinc-400">
+                  No members found.
                 </td>
-                <td className="p-4">{i === 0 ? "Superadmin" : i < 3 ? "Admin" : "Member"}</td>
-                <td className="p-4">
-                  <Pill>Active</Pill>
-                </td>
-                <td className="p-4">Today</td>
-                <td className="p-4">Sep {13 - i}</td>
-                <td className="p-4">{980 - i * 50}</td>
-                <td className="p-4 text-orange-600">{420 - i * 16}</td>
-                <td className="p-4">{760 - i * 42}</td>
               </tr>
-            ))}
+            ) : (
+              displayList.map((u: any) => {
+                const name = u.name || u.email || "Member";
+                const roleName = u.roles?.map((r: any) => r.role?.name || r.name).join(", ") || (u.role || "Member");
+                const joinedDate = u.createdAt ? new Date(u.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Active";
+                return (
+                  <tr className="border-t" key={u.id || u.email}>
+                    <td className="p-4">
+                      <span className="flex items-center gap-3">
+                        <Avatar name={name} />
+                        <b>{name}</b>
+                      </span>
+                    </td>
+                    <td className="p-4 text-zinc-500 text-xs">{u.email}</td>
+                    <td className="p-4 font-medium text-xs">
+                      <span className="inline-flex items-center rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-bold text-orange-700">
+                        {roleName}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <Pill>{u.status || "Active"}</Pill>
+                    </td>
+                    <td className="p-4 text-zinc-500 text-xs">{joinedDate}</td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </Card>

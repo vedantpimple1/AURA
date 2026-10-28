@@ -67,10 +67,12 @@ taskRouter.post('/', requireRole('ADMIN', 'SUPERADMIN'), async (req: Request, re
 /**
  * DELETE /api/tasks/:taskId
  * Deletes a task. Requires ADMIN or SUPERADMIN.
+ * Enforces rule: Admin cannot delete tasks created by Superadmin.
  */
 taskRouter.delete('/:taskId', requireRole('ADMIN', 'SUPERADMIN'), async (req: Request, res: Response): Promise<void> => {
   try {
-    await TaskService.deleteTask(req.params.taskId as string);
+    const session = req.session!;
+    await TaskService.deleteTask(req.params.taskId as string, session.roles);
     res.json({ success: true });
   } catch (error) {
     const { statusCode, ...body } = handleError(error) as any;
