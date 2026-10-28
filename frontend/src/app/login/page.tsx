@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Zap } from "lucide-react";
 import { Suspense } from "react";
 
+import Link from "next/link";
+
 function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,7 +56,15 @@ function LoginForm() {
             <input name="email" type="email" required className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="you@kaiaura.com" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5 text-zinc-700">Password</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-zinc-700">Password</label>
+              <Link
+                href="/forgot-password"
+                className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <input name="password" type="password" required className="w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="••••••••" />
           </div>
           <button type="submit" disabled={loading} className="mt-6 w-full rounded-xl bg-orange-600 py-3 text-sm font-bold text-white transition hover:bg-orange-700 disabled:opacity-50">

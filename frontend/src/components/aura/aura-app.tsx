@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -39,10 +39,12 @@ import {
   RefreshCw,
   Lock,
   FileText,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Wall } from "@/components/aura/Wall";
+import { RecoveryQueuePage } from "@/components/aura/recovery-queue";
 import { logoutAction } from "@/actions/auth.actions";
 import { createUserAction } from "@/actions/user.actions";
 import { awardAuraAction, getAuraBalanceAction, getCumulativeAuraAction } from "@/actions/aura.actions";
@@ -83,6 +85,7 @@ type Page =
   | "analytics"
   | "audit"
   | "deliveries"
+  | "recovery"
   | "settings";
 
 // The 7-Level Gamified Tier System - Allotments based on Lifetime Cumulative Aura
@@ -165,6 +168,7 @@ export function AuraApp({
   initialDeliverySummary = null,
   initialDeliveriesData = null,
   initialTab = "home",
+  sessionRoles = [],
 }: {
   initialRole?: string;
   userName?: string;
@@ -182,6 +186,7 @@ export function AuraApp({
   initialDeliverySummary?: any;
   initialDeliveriesData?: any;
   initialTab?: string;
+  sessionRoles?: string[];
 }) {
   if (initialUsers && initialUsers.length > 0) {
     members = initialUsers.map((u: any) => u.name || u.email);
@@ -195,8 +200,11 @@ export function AuraApp({
   const role: Role = (initialRole as Role) || "Member";
 
   const isAllowedPage = (p: Page, r: Role) => {
+    if (p === "recovery") {
+      return sessionRoles.includes("RECOVERY_OPERATOR");
+    }
     if (r === "Member") {
-      return !["reviews", "members", "analytics", "audit", "deliveries"].includes(p);
+      return !["reviews", "members", "analytics", "audit", "deliveries", "recovery"].includes(p);
     }
     return true;
   };
@@ -307,7 +315,15 @@ export function AuraApp({
     }
   }, [page]);
 
-  const nav = role === "Member" ? memberNav : adminNav;
+  const isRecoveryOperator = sessionRoles.includes("RECOVERY_OPERATOR");
+  const baseNav = role === "Member" ? memberNav : adminNav;
+  const nav = isRecoveryOperator
+    ? [
+        ...baseNav.slice(0, baseNav.length - 1),
+        ["recovery", "Password Recovery", ShieldAlert] as [Page, string, LucideIcon],
+        ...baseNav.slice(baseNav.length - 1),
+      ]
+    : baseNav;
 
   const notify = (s: string) => {
     setToast(s);
@@ -599,13 +615,13 @@ export function AuraApp({
                 </>
               )}
             </div>
-            
+
             {/* Authenticated Role Badge & Profile Hover */}
             <div className="group relative">
               <span className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 cursor-default">
                 {role}
               </span>
-              
+
               <div className="absolute right-0 top-full mt-2 hidden w-64 flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl group-hover:flex z-50 transition-all duration-200">
                 <div className="flex items-center gap-3 border-b border-zinc-100 pb-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 font-bold text-orange-600">
@@ -716,6 +732,7 @@ export function AuraApp({
               notify={notify}
             />
           )}
+          {page === "recovery" && <RecoveryQueuePage />}
           {page === "settings" && (
             <SettingsPage
               notify={notify}
@@ -1203,12 +1220,12 @@ function AdminHome({
         ["This month", "4,860", Flame],
       ]
     : [
-        ["Pending approvals", "3", Clock3],
-        ["Awaiting review", "8", FileCheck2],
-        ["Team Aura", "4,860", Sparkles],
-        ["Completed", "42", CheckCircle2],
-        ["Redemptions", "5", Gift],
-      ];
+      ["Pending approvals", "3", Clock3],
+      ["Awaiting review", "8", FileCheck2],
+      ["Team Aura", "4,860", Sparkles],
+      ["Completed", "42", CheckCircle2],
+      ["Redemptions", "5", Gift],
+    ];
 
   const pendingSubmissions = (initialTasks || [])
     .filter((t: any) => t.assignments?.some((a: any) => a.status === "SUBMITTED"))
@@ -1514,8 +1531,8 @@ function Tasks({
               x === "All tasks"
                 ? displayItems.length
                 : displayItems.filter(
-                    (item) => (STATUS_FILTER_MAP[item.assignmentStatus] || item.assignmentStatus) === x
-                  ).length;
+                  (item) => (STATUS_FILTER_MAP[item.assignmentStatus] || item.assignmentStatus) === x
+                ).length;
             const active = filter === x;
             return (
               <button
@@ -2002,6 +2019,20 @@ function TaskModal({
           </div>
         )}
 
+        {isAdmin && (
+          <div className="mt-4 flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              disabled={loading}
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              Delete Task
+            </Button>
+          </div>
+        )}
+
         {/* Admin View: Submissions & Work Inspection */}
         {isAdmin && (
           <div className="mt-5 space-y-4">
@@ -2198,10 +2229,13 @@ function ChampionConfetti() {
     height: number;
     x: number;
     y: number;
+    fall: number;
+    wobble: number;
     rot: number;
     delay: number;
     duration: number;
     isStreamer: boolean;
+    shape: "rect" | "circle";
   }>>([]);
 
   useEffect(() => {
@@ -2209,39 +2243,46 @@ function ChampionConfetti() {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReducedMotion) return;
 
-    // Palette: Gold, warm orange, amber, pastel mint, coral peach, pastel yellow
+    // 1st Place Gold Champion celebratory palette
     const colors = [
       "#f59e0b", // Amber gold
       "#ea580c", // Brand orange
       "#fbbf24", // Warm yellow
       "#fb923c", // Soft peach orange
-      "#34d399", // Pastel emerald/mint
-      "#f472b6", // Pastel rose
-      "#60a5fa", // Pastel sky
-      "#fef08a", // Light gold
+      "#fcd34d", // Bright yellow
+      "#fef08a", // Light gold sparkle
+      "#f97316", // Vivid orange
+      "#ffffff", // Shimmer white
     ];
 
-    const generated = Array.from({ length: 42 }, (_, i) => {
-      // Angle spanning -160deg to -20deg (bursting upwards and outwards)
-      const angle = -Math.PI * (0.15 + 0.7 * Math.random());
-      // Distance burst radius 80px to 190px
-      const dist = 75 + Math.random() * 110;
-      const x = Math.cos(angle) * dist;
-      const y = Math.sin(angle) * dist;
-      const rot = (Math.random() - 0.5) * 720;
-      const isStreamer = i % 6 === 0;
+    const generated = Array.from({ length: 48 }, (_, i) => {
+      // Fan upwards and outwards over 1st place champion
+      const angle = -Math.PI * (0.16 + 0.68 * Math.random());
+      // Radius tuned to stay over 1st place column (~45px to 85px max horizontal spread)
+      const force = 45 + Math.random() * 50;
+      const x = Math.round(Math.cos(angle) * force);
+      const y = Math.round(Math.sin(angle) * force);
+      const fall = Math.round(110 + Math.random() * 110);
+      const wobble = Math.round((Math.random() - 0.5) * 28);
+      const rot = Math.round((Math.random() - 0.5) * 900);
+
+      const isStreamer = i % 5 === 0;
+      const isCircle = i % 4 === 1;
 
       return {
         id: i,
         color: colors[i % colors.length],
-        width: isStreamer ? 4 : Math.floor(6 + Math.random() * 5),
-        height: isStreamer ? Math.floor(12 + Math.random() * 8) : Math.floor(7 + Math.random() * 6),
-        x: Math.round(x),
-        y: Math.round(y),
-        rot: Math.round(rot),
-        delay: Math.round(Math.random() * 180),
-        duration: Math.round(1400 + Math.random() * 600),
+        width: isStreamer ? 3.5 : isCircle ? 5 : Math.floor(5 + Math.random() * 4),
+        height: isStreamer ? Math.floor(12 + Math.random() * 7) : isCircle ? 5 : Math.floor(6 + Math.random() * 5),
+        x,
+        y,
+        fall,
+        wobble,
+        rot,
+        delay: Math.round(Math.random() * 220),
+        duration: Math.round(1600 + Math.random() * 600),
         isStreamer,
+        shape: isCircle ? ("circle" as const) : ("rect" as const),
       };
     });
 
@@ -2251,7 +2292,7 @@ function ChampionConfetti() {
     const timer = setTimeout(() => {
       setActive(false);
       setParticles([]);
-    }, 2200);
+    }, 2800);
 
     return () => clearTimeout(timer);
   }, []);
@@ -2260,26 +2301,30 @@ function ChampionConfetti() {
 
   return (
     <div
-      className="absolute -top-12 left-1/2 -translate-x-1/2 w-0 h-0 pointer-events-none select-none z-30"
+      className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 w-0 h-0 select-none z-30"
       aria-hidden="true"
     >
       <style>{`
         @keyframes champion-confetti-burst {
           0% {
-            opacity: 1;
-            transform: translate3d(0, 0, 0) rotate(0deg) scale(0.6);
+            opacity: 0;
+            transform: translate3d(0, 0, 0) scale(0.3) rotate(0deg);
           }
-          20% {
+          15% {
             opacity: 1;
-            transform: translate3d(var(--cx), calc(var(--cy) * 0.9), 0) rotate(calc(var(--crot) * 0.3)) scale(1.1);
+            transform: translate3d(calc(var(--cx) * 0.45), calc(var(--cy) * 0.65), 0) scale(1.15) rotate(calc(var(--crot) * 0.25));
           }
-          65% {
+          40% {
+            opacity: 1;
+            transform: translate3d(var(--cx), var(--cy), 0) scale(1) rotate(calc(var(--crot) * 0.5));
+          }
+          70% {
             opacity: 0.95;
-            transform: translate3d(var(--cx), calc(var(--cy) + 24px), 0) rotate(calc(var(--crot) * 0.7)) scale(0.95);
+            transform: translate3d(calc(var(--cx) + var(--wobble)), calc(var(--cy) + var(--fall) * 0.55), 0) scale(0.95) rotate(calc(var(--crot) * 0.8));
           }
           100% {
             opacity: 0;
-            transform: translate3d(var(--cx), calc(var(--cy) + 70px), 0) rotate(var(--crot)) scale(0.6);
+            transform: translate3d(calc(var(--cx) + var(--wobble) * 2), calc(var(--cy) + var(--fall)), 0) scale(0.65) rotate(var(--crot));
           }
         }
       `}</style>
@@ -2293,19 +2338,20 @@ function ChampionConfetti() {
             width: `${p.width}px`,
             height: `${p.height}px`,
             backgroundColor: p.color,
-            borderRadius: p.isStreamer ? "3px" : "1.5px",
+            borderRadius: p.shape === "circle" ? "50%" : p.isStreamer ? "3px" : "1.5px",
             boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
             animationName: "champion-confetti-burst",
             animationDuration: `${p.duration}ms`,
-            animationTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+            animationTimingFunction: "cubic-bezier(0.25, 1, 0.4, 1)",
             animationFillMode: "forwards",
             animationDelay: `${p.delay}ms`,
             transformOrigin: "center center",
             willChange: "transform, opacity",
-            // @ts-ignore
-            "--cx": `${p.x}px`,
-            "--cy": `${p.y}px`,
-            "--crot": `${p.rot}deg`,
+            ["--cx" as any]: `${p.x}px`,
+            ["--cy" as any]: `${p.y}px`,
+            ["--fall" as any]: `${p.fall}px`,
+            ["--wobble" as any]: `${p.wobble}px`,
+            ["--crot" as any]: `${p.rot}deg`,
           }}
         />
       ))}
@@ -2372,7 +2418,7 @@ function Leaderboard({ users = [] }: { users?: any[] }) {
           <div className="flex w-1/3 flex-col items-center">
             {/* Perched on top of step 1 with Real Celebratory Confetti Burst */}
             <div className="mb-3 flex flex-col items-center text-center relative">
-              {/* Confetti celebration attached to first-place champion */}
+              {/* Confetti popper burst exclusively celebrating 1st place */}
               <ChampionConfetti />
 
               <div className="relative -mb-1 animate-bounce motion-reduce:animate-none text-3xl sm:text-4xl">👑</div>
@@ -2695,7 +2741,7 @@ function LegacyWall({
 // Database-backed Store Page with Admin Redemptions Queue
 function StoreProductImage({ url, name, gradientClass, category }: { url: string | null; name: string; gradientClass: string, category: string }) {
   const [error, setError] = useState(false);
-  
+
   if (!url || error) {
     return (
       <div className={cn("relative h-44 overflow-hidden grid place-items-center bg-gradient-to-br", gradientClass)}>
@@ -2709,10 +2755,10 @@ function StoreProductImage({ url, name, gradientClass, category }: { url: string
 
   return (
     <div className="relative h-44 overflow-hidden bg-zinc-50">
-      <img 
-        src={url} 
-        alt={name} 
-        className="h-full w-full object-contain p-3" 
+      <img
+        src={url}
+        alt={name}
+        className="h-full w-full object-contain p-3"
         onError={() => setError(true)}
       />
       <span className="absolute top-2 left-2 rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-semibold text-zinc-600 shadow-sm">
@@ -2784,33 +2830,33 @@ function StorePage({
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setStoreTab("catalog")}
-          className={cn(
-            "rounded-xl px-4 py-2 text-sm font-semibold transition",
-            storeTab === "catalog"
-              ? "bg-zinc-900 text-white"
-              : "bg-white text-zinc-600 ring-1 ring-zinc-200"
-          )}
-        >
-          {admin ? `Catalog Inventory (${items.length})` : "Browse Rewards"}
-        </button>
-        <button
-          onClick={() => setStoreTab("redemptions")}
-          className={cn(
-            "rounded-xl px-4 py-2 text-sm font-semibold transition flex items-center gap-2",
-            storeTab === "redemptions"
-              ? "bg-zinc-900 text-white"
-              : "bg-white text-zinc-600 ring-1 ring-zinc-200"
-          )}
-        >
-          {admin ? "Redemption Requests" : `My Redemptions (${redemptionList.length})`}
-          {admin && pendingCount > 0 && (
-            <span className="rounded-full bg-orange-600 px-2 py-0.5 text-xs text-white">
-              {pendingCount}
-            </span>
-          )}
-        </button>
+          <button
+            onClick={() => setStoreTab("catalog")}
+            className={cn(
+              "rounded-xl px-4 py-2 text-sm font-semibold transition",
+              storeTab === "catalog"
+                ? "bg-zinc-900 text-white"
+                : "bg-white text-zinc-600 ring-1 ring-zinc-200"
+            )}
+          >
+            {admin ? `Catalog Inventory (${items.length})` : "Browse Rewards"}
+          </button>
+          <button
+            onClick={() => setStoreTab("redemptions")}
+            className={cn(
+              "rounded-xl px-4 py-2 text-sm font-semibold transition flex items-center gap-2",
+              storeTab === "redemptions"
+                ? "bg-zinc-900 text-white"
+                : "bg-white text-zinc-600 ring-1 ring-zinc-200"
+            )}
+          >
+            {admin ? "Redemption Requests" : `My Redemptions (${redemptionList.length})`}
+            {admin && pendingCount > 0 && (
+              <span className="rounded-full bg-orange-600 px-2 py-0.5 text-xs text-white">
+                {pendingCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Available Aura Balance Display */}
@@ -4472,8 +4518,8 @@ function EmailDeliveriesDashboard({
                 summary?.queue?.redisStatus === "CONNECTED"
                   ? "bg-emerald-500 animate-pulse"
                   : summary?.queue?.redisStatus === "DISABLED"
-                  ? "bg-zinc-400"
-                  : "bg-amber-500"
+                    ? "bg-zinc-400"
+                    : "bg-amber-500"
               )}
             />
             <b className="text-zinc-900">Queue Engine:</b>
@@ -4481,8 +4527,8 @@ function EmailDeliveriesDashboard({
               {summary?.queue?.redisStatus === "CONNECTED"
                 ? "BullMQ / Redis (Live)"
                 : summary?.queue?.redisStatus === "DISABLED"
-                ? "Database Polling (Queue Disabled)"
-                : "Database Polling (Redis Disconnected)"}
+                  ? "Database Polling (Queue Disabled)"
+                  : "Database Polling (Redis Disconnected)"}
             </span>
             {summary?.queue?.counts && (
               <span className="flex items-center gap-1.5 ml-2 font-mono text-[11px] bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded">
@@ -5057,7 +5103,7 @@ function SettingsPage({
     const fieldKey = `${type}-${channel}`;
     setSavingPref(fieldKey);
     const newValue = !currentValue;
-    
+
     // Optimistic UI update
     setPreferences(prev => {
       const exists = prev.some(p => p.notificationType === type);
@@ -5067,10 +5113,10 @@ function SettingsPage({
         return [...prev, { notificationType: type, emailEnabled: true, inAppEnabled: true, [channel]: newValue }];
       }
     });
-    
+
     const res = await updatePreferenceAction(type as any, { [channel]: newValue });
     setSavingPref(null);
-    
+
     if (res.success) {
       setLastSaved(fieldKey);
       setTimeout(() => setLastSaved(null), 2500);
@@ -5123,13 +5169,13 @@ function SettingsPage({
             {isResetting ? "Resetting..." : "Reset to Defaults"}
           </Button>
         </div>
-        
+
         <div className="space-y-4">
           {notificationTypes.map(nt => {
             const pref = preferences.find(p => p.notificationType === nt.id) || { emailEnabled: true, inAppEnabled: true };
             const isSavingThis = savingPref?.startsWith(nt.id);
             const isSavedThis = lastSaved?.startsWith(nt.id) && !isSavingThis;
-            
+
             return (
               <div key={nt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border border-zinc-100 bg-zinc-50/50">
                 <div>
@@ -5146,8 +5192,8 @@ function SettingsPage({
                     </span>
                   )}
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="rounded text-orange-600 focus:ring-orange-500 disabled:opacity-50"
                       checked={pref.inAppEnabled}
                       disabled={savingPref === `${nt.id}-inAppEnabled`}
@@ -5156,8 +5202,8 @@ function SettingsPage({
                     <span className="text-xs font-medium text-zinc-700">In-App</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="rounded text-orange-600 focus:ring-orange-500 disabled:opacity-50"
                       checked={pref.emailEnabled}
                       disabled={savingPref === `${nt.id}-emailEnabled`}

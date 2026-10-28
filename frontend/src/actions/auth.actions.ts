@@ -40,3 +40,71 @@ export async function logoutAction() {
   await clearSession();
   redirect('/login');
 }
+
+/**
+ * Public request for password reset.
+ * Always returns a generic confirmation message.
+ */
+export async function requestPasswordResetAction(formData: FormData) {
+  const identifier = formData.get('identifier') as string;
+  return await apiClient.post<{ message: string }>('/auth/password-reset-requests', { identifier });
+}
+
+/**
+ * Validate reset token on page load.
+ */
+export async function validateResetTokenAction(token: string) {
+  return await apiClient.get<{
+    valid: boolean;
+    reason?: 'MISSING_TOKEN' | 'INVALID' | 'ALREADY_USED' | 'EXPIRED' | 'INACTIVE';
+    message?: string;
+    expiresAt?: string;
+    maskedEmail?: string;
+  }>('/auth/validate-reset-token', { token });
+}
+
+/**
+ * Public password reset submission.
+ */
+export async function resetPasswordAction(token: string, password: string) {
+  return await apiClient.post<{ message: string }>('/auth/reset-password', { token, password });
+}
+
+/**
+ * Admin: get recovery requests queue (requires PASSWORD_RESET_REQUEST_MANAGE).
+ */
+export async function getRecoveryRequestsAction(params?: {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  search?: string;
+}) {
+  return await apiClient.get('/admin/password-reset-requests', params);
+}
+
+/**
+ * Admin: verify member identity.
+ */
+export async function verifyRecoveryRequestAction(requestId: string, notes?: string) {
+  return await apiClient.post(`/admin/password-reset-requests/${requestId}/verify`, { notes });
+}
+
+/**
+ * Admin: issue one-time reset link.
+ */
+export async function issueResetLinkAction(requestId: string) {
+  return await apiClient.post<{
+    requestId: string;
+    resetUrl: string;
+    expiresAt: string;
+    targetUser: { id: string; name: string; email: string; employeeId: string };
+  }>(`/admin/password-reset-requests/${requestId}/issue-link`);
+}
+
+/**
+ * Admin: cancel recovery request.
+ */
+export async function cancelRecoveryRequestAction(requestId: string, reason?: string) {
+  return await apiClient.post(`/admin/password-reset-requests/${requestId}/cancel`, { reason });
+}
+

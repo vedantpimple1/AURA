@@ -21,6 +21,8 @@ export type SessionPayload = {
   userId: string;
   email: string;
   roles?: string[];
+  iat?: number;
+  exp?: number;
 };
 
 export async function hashPassword(password: string): Promise<string> {

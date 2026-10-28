@@ -35,7 +35,34 @@ async function main() {
     create: { name: 'USER' },
   });
 
-  console.log(`Roles ensured: ${adminRole.name}, ${superAdminRole.name}, ${userRole.name}`);
+  const recoveryRole = await prisma.role.upsert({
+    where: { name: 'RECOVERY_OPERATOR' },
+    update: {},
+    create: { name: 'RECOVERY_OPERATOR' },
+  });
+
+  const resetPermission = await prisma.permission.upsert({
+    where: { name: 'PASSWORD_RESET_REQUEST_MANAGE' },
+    update: {},
+    create: { name: 'PASSWORD_RESET_REQUEST_MANAGE' },
+  });
+
+  await prisma.rolePermission.upsert({
+    where: {
+      roleId_permissionId: {
+        roleId: recoveryRole.id,
+        permissionId: resetPermission.id,
+      },
+    },
+    update: {},
+    create: {
+      roleId: recoveryRole.id,
+      permissionId: resetPermission.id,
+    },
+  });
+
+  console.log(`Roles ensured: ${adminRole.name}, ${superAdminRole.name}, ${userRole.name}, ${recoveryRole.name}`);
+  console.log(`Permissions ensured: ${resetPermission.name}`);
 
   // Create Superadmin User
   const superAdminEmail = 'superadmin@kaiaura.com';
@@ -44,9 +71,7 @@ async function main() {
 
   const superadmin = await prisma.user.upsert({
     where: { email: superAdminEmail },
-    update: {
-      passwordHash: hashedSuperPassword,
-    },
+    update: {},
     create: {
       email: superAdminEmail,
       employeeId: 'EMP000',
@@ -70,9 +95,7 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
-    update: {
-      passwordHash: hashedPassword,
-    },
+    update: {},
     create: {
       email: adminEmail,
       employeeId: 'EMP001',
@@ -95,9 +118,7 @@ async function main() {
 
   const member = await prisma.user.upsert({
     where: { email: memberEmail },
-    update: {
-      passwordHash: hashedMemberPassword,
-    },
+    update: {},
     create: {
       email: memberEmail,
       employeeId: 'EMP002',
@@ -113,6 +134,24 @@ async function main() {
   });
 
   console.log(`Member user ensured: ${member.email}`);
+
+  // Create Designated Recovery Operator User
+  // Assign RECOVERY_OPERATOR role to Admin user
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId: {
+        userId: admin.id,
+        roleId: recoveryRole.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: admin.id,
+      roleId: recoveryRole.id,
+    },
+  });
+
+  console.log(`Recovery operator role ensured on: ${admin.email}`);
   const batch = await prisma.batch.upsert({
     where: { id: 'test-batch-1' },
     update: {},

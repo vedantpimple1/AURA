@@ -26,6 +26,7 @@ model User {
   email          String   @unique
   avatarUrl      String?
   passwordHash   String?
+  passwordChangedAt DateTime?
   authProviderId String?
   status         String   @default("ACTIVE")
   createdAt      DateTime @default(now())
@@ -51,6 +52,12 @@ model User {
   notifications Notification[]
   notificationPreferences NotificationPreference[]
   auditLogs     AuditLog[]
+
+  // Admin-Assisted Password Reset Relations
+  passwordResetRequests PasswordResetRequest[] @relation("TargetUserResetRequests")
+  verifiedResetRequests PasswordResetRequest[] @relation("VerifiedByOperator")
+  issuedResetRequests   PasswordResetRequest[] @relation("IssuedByOperator")
+  cancelledResetRequests PasswordResetRequest[] @relation("CancelledByOperator")
 }
 
 model Role {
@@ -344,3 +351,44 @@ model NotificationDelivery {
 
   @@unique([notificationId, channel])
 }
+
+// ---------------------------------------------------------
+// PHASE 08: ADMIN-ASSISTED PASSWORD RESET RECOVERY
+// ---------------------------------------------------------
+
+model PasswordResetRequest {
+  id                  String    @id @default(cuid())
+  userId              String
+  user                User      @relation("TargetUserResetRequests", fields: [userId], references: [id], onDelete: Cascade)
+  status              String    @default("PENDING") // PENDING, VERIFIED, LINK_ISSUED, COMPLETED, EXPIRED, CANCELLED
+  
+  // Verification details
+  verifiedAt          DateTime?
+  verifiedById        String?
+  verifiedBy          User?     @relation("VerifiedByOperator", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verificationNotes   String?
+
+  // Token details (ONLY cryptographic hash stored; raw token NEVER stored)
+  tokenHash           String?   @unique
+  tokenExpiresAt      DateTime?
+  issuedAt            DateTime?
+  issuedById          String?
+  issuedBy            User?     @relation("IssuedByOperator", fields: [issuedById], references: [id], onDelete: SetNull)
+
+  // Completion & Cancellation
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  cancelledById       String?
+  cancelledBy         User?     @relation("CancelledByOperator", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancellationReason  String?
+
+  // Request metadata
+  requestIp           String?
+  userAgent           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+

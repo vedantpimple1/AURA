@@ -36,6 +36,12 @@ export default async function Home({
   if (["reviews", "members", "analytics", "audit", "deliveries"].includes(rawTab) && primaryRole === "Member") {
     rawTab = "home";
   }
+
+  // Recovery tab requires RECOVERY_OPERATOR explicit role
+  const isRecoveryOperator = session.roles?.includes("RECOVERY_OPERATOR") || false;
+  if (rawTab === "recovery" && !isRecoveryOperator) {
+    rawTab = "home";
+  }
   const initialTab = rawTab;
   
   const usersRes = await getUsersAction();
@@ -122,6 +128,7 @@ export default async function Home({
       initialDeliverySummary={initialDeliverySummary}
       initialDeliveriesData={initialDeliveriesData}
       initialTab={initialTab}
+      sessionRoles={session?.roles || []}
     />
   );
 }

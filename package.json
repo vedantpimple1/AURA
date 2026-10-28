@@ -4,6 +4,7 @@
   "private": true,
   "description": "KAI Aura — Deployment-Ready Decoupled Monorepo (frontend & backend)",
   "scripts": {
+    "dev": "npm run dev:backend",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
     "dev:worker": "npm --prefix backend run worker",

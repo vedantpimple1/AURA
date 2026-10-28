@@ -13,6 +13,7 @@ import { observabilityRouter } from './routes/observability.routes';
 import { analyticsRouter } from './routes/analytics.routes';
 import { auditRouter } from './routes/audit.routes';
 import { aiRouter } from './routes/ai.routes';
+import { passwordResetRouter } from './routes/password-reset.routes';
 import { ApplicationError } from './lib/errors';
 
 const app = express();
@@ -51,6 +52,7 @@ app.use('/api/observability', observabilityRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/audit', auditRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api', passwordResetRouter);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
