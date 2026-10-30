@@ -40,13 +40,14 @@ import {
   Lock,
   FileText,
   ShieldAlert,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Wall } from "@/components/aura/Wall";
 import { RecoveryQueuePage } from "@/components/aura/recovery-queue";
 import { logoutAction } from "@/actions/auth.actions";
-import { createUserAction } from "@/actions/user.actions";
+import { createUserAction, deleteUserAction } from "@/actions/user.actions";
 import { awardAuraAction, getAuraBalanceAction, getCumulativeAuraAction } from "@/actions/aura.actions";
 import { createTaskAction, submitTaskAction, reviewTaskAction, deleteTaskAction, updateAssignmentStatusAction } from "@/actions/task.actions";
 import { createStoreItemAction, redeemStoreItemAction, fulfillRedemptionAction } from "@/actions/store.actions";
@@ -690,7 +691,7 @@ export function AuraApp({
           )}
           {page === "reviews" && <Reviews notify={notify} initialTasks={initialTasks} />}
           {page === "members" && (
-            <Members notify={notify} openAddUser={() => setShowAddUser(true)} users={initialUsers} />
+            <Members notify={notify} openAddUser={() => setShowAddUser(true)} users={initialUsers} currentUser={currentUser} role={role} />
           )}
           {page === "leaderboard" && <Leaderboard users={initialUsers} />}
           {page === "wall" && (
@@ -3321,12 +3322,43 @@ function Members({
   notify,
   openAddUser,
   users = [],
+  currentUser,
+  role = "Member",
 }: {
   notify: (s: string) => void;
   openAddUser: () => void;
   users?: any[];
+  currentUser?: any;
+  role?: string;
 }) {
-  const displayList = users && users.length > 0 ? users : [];
+  const [memberList, setMemberList] = useState<any[]>(users && users.length > 0 ? users : []);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const displayList = memberList;
+  const isAdmin = role === "Admin" || role === "Superadmin";
+  const isSuperadmin = role === "Superadmin";
+
+  // Keep local state in sync if parent re-renders with fresh users prop
+  useEffect(() => {
+    if (users && users.length > 0) setMemberList(users);
+  }, [users]);
+
+  async function handleDelete(u: any) {
+    const name = u.name || u.email;
+    if (!confirm(`Are you sure you want to delete "${name}"? They will be removed from all teams.`)) {
+      return;
+    }
+    setDeletingId(u.id);
+    notify("Deleting member...");
+    const res = await deleteUserAction(u.id);
+    setDeletingId(null);
+    if (res.success) {
+      // Remove from local list instantly — no full page reload needed
+      setMemberList((prev) => prev.filter((m) => m.id !== u.id));
+      notify("Member deleted successfully!");
+    } else {
+      notify((res as any).error || "Failed to delete member");
+    }
+  }
 
   return (
     <>
@@ -3344,17 +3376,32 @@ function Members({
         {displayList.map((u: any) => {
           const name = u.name || u.email || "Member";
           const roleName = u.roles?.map((r: any) => r.role?.name || r.name).join(", ") || (u.role || "Member");
+          const targetIsAdmin = roleName.toUpperCase().includes("ADMIN");
+          const canDelete = isAdmin && u.id !== currentUser?.id && (isSuperadmin || !targetIsAdmin);
+
           return (
             <Card className="p-4" key={u.id || u.email}>
-              <div className="flex gap-3">
-                <Avatar name={name} />
-                <span className="flex-1">
-                  <b>{name}</b>
-                  <small className="block text-zinc-500">
-                    {roleName} · {u.status || "Active"}
-                  </small>
-                </span>
-                <span className="text-xs text-zinc-400">{u.email}</span>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Avatar name={name} />
+                  <span className="flex-1 truncate">
+                    <b>{name}</b>
+                    <small className="block text-zinc-500">
+                      {roleName} · {u.status || "Active"}
+                    </small>
+                  </span>
+                </div>
+                {canDelete && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(u)}
+                    className="border-red-200 text-red-600 hover:bg-red-50 p-2 h-auto"
+                    title="Delete member"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </Card>
           );
@@ -3364,13 +3411,7 @@ function Members({
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-zinc-50 text-xs text-zinc-500">
             <tr>
-              {[
-                "Member",
-                "Email",
-                "Role",
-                "Status",
-                "Joined",
-              ].map((x) => (
+              {["Member", "Email", "Role", "Status", "Joined", "Action"].map((x) => (
                 <th className="p-4" key={x}>
                   {x}
                 </th>
@@ -3380,7 +3421,7 @@ function Members({
           <tbody>
             {displayList.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-zinc-400">
+                <td colSpan={6} className="p-8 text-center text-zinc-400">
                   No members found.
                 </td>
               </tr>
@@ -3388,7 +3429,12 @@ function Members({
               displayList.map((u: any) => {
                 const name = u.name || u.email || "Member";
                 const roleName = u.roles?.map((r: any) => r.role?.name || r.name).join(", ") || (u.role || "Member");
-                const joinedDate = u.createdAt ? new Date(u.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Active";
+                const joinedDate = u.createdAt
+                  ? new Date(u.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                  : "Active";
+                const targetIsAdmin = roleName.toUpperCase().includes("ADMIN");
+                const canDelete = isAdmin && u.id !== currentUser?.id && (isSuperadmin || !targetIsAdmin);
+
                 return (
                   <tr className="border-t" key={u.id || u.email}>
                     <td className="p-4">
@@ -3407,6 +3453,21 @@ function Members({
                       <Pill>{u.status || "Active"}</Pill>
                     </td>
                     <td className="p-4 text-zinc-500 text-xs">{joinedDate}</td>
+                    <td className="p-4">
+                      {canDelete ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(u)}
+                          className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 text-xs flex items-center gap-1"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-zinc-300">—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })
