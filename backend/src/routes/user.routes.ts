@@ -59,3 +59,22 @@ userRouter.post('/', requireRole('ADMIN', 'SUPERADMIN'), async (req: Request, re
     res.status(statusCode ?? 500).json({ success: false, ...body });
   }
 });
+
+/**
+ * DELETE /api/users/:id
+ * Deletes a user with cascading cleanup. Requires ADMIN or SUPERADMIN.
+ */
+userRouter.delete('/:id', requireRole('ADMIN', 'SUPERADMIN'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const session = req.session!;
+    const result = await UserService.deleteUser(
+      req.params.id as string,
+      session.roles || [],
+      session.userId
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    const { statusCode, ...body } = handleError(error) as any;
+    res.status(statusCode ?? 500).json({ success: false, ...body });
+  }
+});

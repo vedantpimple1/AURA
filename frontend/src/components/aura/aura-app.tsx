@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Award,
@@ -34,13 +34,15 @@ import {
   Mail,
   RotateCcw,
   AlertCircle,
+  AlertTriangle,
+  Pencil,
+  Trash2,
   ChevronLeft,
   Eye,
   RefreshCw,
   Lock,
   FileText,
   ShieldAlert,
-  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -51,7 +53,15 @@ import { createUserAction, deleteUserAction } from "@/actions/user.actions";
 import { awardAuraAction, getAuraBalanceAction, getCumulativeAuraAction } from "@/actions/aura.actions";
 import { createTaskAction, submitTaskAction, reviewTaskAction, deleteTaskAction, updateAssignmentStatusAction } from "@/actions/task.actions";
 import { createStoreItemAction, redeemStoreItemAction, fulfillRedemptionAction } from "@/actions/store.actions";
-import { createTeamAction, sendKudosAction } from "@/actions/team.actions";
+import {
+  createTeamAction,
+  updateTeamAction,
+  deleteTeamAction,
+  addTeamMemberAction,
+  removeTeamMemberAction,
+  getTeamsAction,
+  sendKudosAction,
+} from "@/actions/team.actions";
 import {
   markNotificationAsReadAction,
   markAllNotificationsAsReadAction,
@@ -251,12 +261,66 @@ export function AuraApp({
   const [selectedKudosUser, setSelectedKudosUser] = useState<any | null>(null);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
 
+  // Tag Teams State with live reactive refresh
+  const [teams, setTeams] = useState<any[]>(initialTeams);
+
+  useEffect(() => {
+    if (initialTeams) setTeams(initialTeams);
+  }, [initialTeams]);
+
+  const refreshTeams = async () => {
+    try {
+      const res = await getTeamsAction();
+      if (res.success && Array.isArray(res.data)) {
+        setTeams(res.data);
+      }
+    } catch (e) {
+      console.error("Failed to refresh teams", e);
+    }
+  };
+
   // Notifications & Global Search state
   const [notifications, setNotifications] = useState<any[]>(initialNotifications);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Click-away / outside click dismissal refs
+  const notifRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss dropdowns when clicking outside or pressing Escape (Light Dismiss / Click-Away Listener)
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node;
+      if (notifRef.current && !notifRef.current.contains(target)) {
+        setShowNotifDropdown(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(target)) {
+        setShowSearchModal(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowNotifDropdown(false);
+        setShowSearchModal(false);
+      }
+    }
+
+    if (showNotifDropdown || showSearchModal) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showNotifDropdown, showSearchModal]);
 
   // Dynamic Authoritative Aura Balance State
   const [auraBalance, setAuraBalance] = useState<number>(initialAuraBalance ?? 0);
@@ -401,7 +465,7 @@ export function AuraApp({
 
 
             {/* Interactive Search Bar */}
-            <div className="relative hidden sm:block">
+            <div ref={searchRef} className="relative hidden sm:block">
               <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-600 transition focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-100">
                 <Search className="h-4 w-4 text-zinc-400" />
                 <input
@@ -421,12 +485,7 @@ export function AuraApp({
 
               {/* Instant Search Results Dropdown */}
               {showSearchModal && searchQuery.trim().length > 0 && (
-                <>
-                  <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setShowSearchModal(false)}
-                  />
-                  <div className="absolute right-0 top-12 z-40 w-96 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xl">
+                <div className="absolute right-0 top-12 z-40 w-96 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xl">
                     <div className="mb-2 px-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
                       Search Results for &ldquo;{searchQuery}&rdquo;
                     </div>
@@ -516,16 +575,17 @@ export function AuraApp({
                         )}
                     </div>
                   </div>
-                </>
               )}
             </div>
 
             {/* Interactive Notification Bell */}
-            <div className="relative">
+            <div ref={notifRef} className="relative">
               <button
-                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                onClick={() => setShowNotifDropdown((prev) => !prev)}
                 className="relative rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none"
                 title="Notifications"
+                aria-expanded={showNotifDropdown}
+                aria-haspopup="true"
               >
                 <Bell className="h-5 w-5" />
                 {notifications.filter((n) => !n.readAt).length > 0 && (
@@ -537,12 +597,7 @@ export function AuraApp({
 
               {/* Notification Dropdown Panel */}
               {showNotifDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setShowNotifDropdown(false)}
-                  />
-                  <div className="absolute right-0 top-12 z-40 w-80 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl sm:w-96">
+                <div className="absolute right-0 top-12 z-40 w-80 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl sm:w-96">
                     <div className="mb-3 flex items-center justify-between border-b border-zinc-100 pb-2">
                       <div className="flex items-center gap-2">
                         <BellRing className="h-4 w-4 text-orange-600" />
@@ -614,7 +669,6 @@ export function AuraApp({
                       )}
                     </div>
                   </div>
-                </>
               )}
             </div>
 
@@ -735,7 +789,11 @@ export function AuraApp({
           {page === "profile" && <Profile userName={userName} balance={auraBalance} cumulativeAura={cumulativeAura} />}
           {page === "tag" && (
             <TagTeams
-              teams={initialTeams}
+              teams={teams}
+              users={initialUsers}
+              role={role}
+              notify={notify}
+              onTeamsUpdated={refreshTeams}
               openCreateTeam={() => setShowCreateTeam(true)}
             />
           )}
@@ -4189,7 +4247,7 @@ function CreateTeamModal({
     const fd = new FormData(e.currentTarget);
     const res = await createTeamAction(fd);
     if (res.success) {
-      notify("Team created successfully!");
+      notify("Team created successfully! Starts with 0 members and 0 Aura.");
       onSuccess();
     } else {
       notify((res as any).error || "Failed to create team");
@@ -4198,41 +4256,44 @@ function CreateTeamModal({
   }
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-zinc-900/30 p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-900/40 p-4 backdrop-blur-xs">
       <Card className="w-full max-w-md p-6">
         <div className="flex justify-between mb-4">
           <h3 className="text-xl font-bold flex items-center gap-2">
             <Users className="h-5 w-5 text-orange-600" />
             Create Tag Team
           </h3>
-          <button onClick={close}>
+          <button onClick={close} className="text-zinc-400 hover:text-zinc-600">
             <X className="h-5 w-5" />
           </button>
         </div>
+        <p className="text-xs text-zinc-500 mb-4 leading-relaxed">
+          New teams logically start with <b>0 Aura points</b>. As an Admin, you can assign team members once the team is created.
+        </p>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-1 block">Team Name</label>
+            <label className="text-sm font-medium mb-1 block text-zinc-700">Team Name *</label>
             <input
               required
               name="name"
-              className="w-full rounded-xl border border-zinc-200 p-2.5 text-sm"
+              className="w-full rounded-xl border border-zinc-200 p-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
               placeholder="e.g. Velocity Vanguards"
             />
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Description</label>
+            <label className="text-sm font-medium mb-1 block text-zinc-700">Team Description</label>
             <textarea
               name="description"
-              className="w-full rounded-xl border border-zinc-200 p-2.5 text-sm"
-              rows={2}
-              placeholder="What is this team focusing on this sprint?"
+              className="w-full rounded-xl border border-zinc-200 p-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+              rows={3}
+              placeholder="What are the mission goals and focus areas of this team?"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100">
             <Button variant="outline" type="button" onClick={close}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="bg-orange-600 hover:bg-orange-700 text-white">
               {loading ? "Creating..." : "Create Team"}
             </Button>
           </div>
@@ -4242,19 +4303,336 @@ function CreateTeamModal({
   );
 }
 
-// Database-backed Tag Teams Page with AI Team Insights
+// Admin Modal: Manage Team Details & Team Members with Single-Team Conflict Protection
+function ManageTeamModal({
+  team,
+  allTeams,
+  users,
+  close,
+  notify,
+  onUpdated,
+}: {
+  team: any;
+  allTeams: any[];
+  users?: any[];
+  close: () => void;
+  notify: (s: string) => void;
+  onUpdated: () => void;
+}) {
+  const [name, setName] = useState(team.name || "");
+  const [description, setDescription] = useState(team.description || "");
+  const [isUpdatingDetails, setIsUpdatingDetails] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedRole, setSelectedRole] = useState("MEMBER");
+  const [isAddingMember, setIsAddingMember] = useState(false);
+  const [actionUserId, setActionUserId] = useState<string | null>(null);
+
+  // Single-team conflict check across entire application
+  const conflictingTeam = selectedUserId
+    ? allTeams.find((t) => t.id !== team.id && t.members?.some((m: any) => m.userId === selectedUserId))
+    : null;
+
+  const isAlreadyInCurrentTeam = team.members?.some((m: any) => m.userId === selectedUserId);
+
+  async function handleSaveDetails(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) {
+      notify("Team name cannot be empty");
+      return;
+    }
+    setIsUpdatingDetails(true);
+    const res = await updateTeamAction(team.id, {
+      name: name.trim(),
+      description: description.trim(),
+    });
+    setIsUpdatingDetails(false);
+    if (res.success) {
+      notify("Team details updated successfully!");
+      onUpdated();
+    } else {
+      notify((res as any).error || "Failed to update team details");
+    }
+  }
+
+  async function handleAddMember() {
+    if (!selectedUserId) {
+      notify("Please select a member to add");
+      return;
+    }
+    if (conflictingTeam) {
+      notify(
+        `Conflict: User is already assigned to team "${conflictingTeam.name}". A member cannot belong to more than one team.`
+      );
+      return;
+    }
+    if (isAlreadyInCurrentTeam) {
+      notify("User is already a member of this team");
+      return;
+    }
+
+    setIsAddingMember(true);
+    const res = await addTeamMemberAction(team.id, selectedUserId, selectedRole);
+    setIsAddingMember(false);
+    if (res.success) {
+      notify("Member added to team!");
+      setSelectedUserId("");
+      onUpdated();
+    } else {
+      notify((res as any).error || "Failed to add member");
+    }
+  }
+
+  async function handleRemoveMember(userId: string, memberName: string) {
+    if (!confirm(`Remove ${memberName} from team "${team.name}"?`)) return;
+
+    setActionUserId(userId);
+    const res = await removeTeamMemberAction(team.id, userId);
+    setActionUserId(null);
+    if (res.success) {
+      notify(`Removed ${memberName} from ${team.name}`);
+      onUpdated();
+    } else {
+      notify((res as any).error || "Failed to remove member");
+    }
+  }
+
+  async function handleDeleteTeam() {
+    if (!confirm(`Are you sure you want to completely delete team "${team.name}"? This cannot be undone.`)) return;
+
+    const res = await deleteTeamAction(team.id);
+    if (res.success) {
+      notify(`Team "${team.name}" deleted successfully`);
+      close();
+      onUpdated();
+    } else {
+      notify((res as any).error || "Failed to delete team");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-900/40 p-4 backdrop-blur-xs overflow-y-auto">
+      <Card className="w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 mb-5">
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-orange-600" />
+            <h3 className="text-lg font-bold text-zinc-900">Manage Team: {team.name}</h3>
+          </div>
+          <button onClick={close} className="text-zinc-400 hover:text-zinc-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Section 1: Edit Team Name & Description */}
+        <form onSubmit={handleSaveDetails} className="space-y-3 rounded-2xl bg-zinc-50/80 p-4 border border-zinc-200/70 mb-6">
+          <div className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1 flex items-center justify-between">
+            <span>Edit Team Information</span>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isUpdatingDetails}
+              className="h-7 text-xs px-3 bg-zinc-900 hover:bg-zinc-800 text-white"
+            >
+              {isUpdatingDetails ? "Saving..." : "Save Details"}
+            </Button>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-zinc-600 block mb-1">Team Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white p-2 text-xs font-medium text-zinc-900 focus:border-orange-500 focus:outline-none"
+              placeholder="Team name"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-zinc-600 block mb-1">Team Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              className="w-full rounded-xl border border-zinc-200 bg-white p-2 text-xs text-zinc-800 focus:border-orange-500 focus:outline-none"
+              placeholder="Describe team focus, charter, or goals"
+            />
+          </div>
+        </form>
+
+        {/* Section 2: Current Team Members */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+              Current Members ({team.members?.length || 0})
+            </h4>
+            <span className="text-xs font-bold text-orange-600">
+              Team Total: {team.monthlyAura ?? 0} Aura this month
+            </span>
+          </div>
+
+          {(!team.members || team.members.length === 0) ? (
+            <div className="rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
+              No members in this team yet. Use the selector below to add members.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {team.members.map((m: any) => (
+                <div
+                  key={m.userId}
+                  className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-3 text-xs"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid h-8 w-8 place-items-center rounded-full bg-orange-100 font-bold text-orange-700">
+                      {(m.user?.name || m.user?.email || "U")[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-zinc-900 flex items-center gap-1.5">
+                        {m.user?.name || m.user?.email}
+                        {m.role === "OWNER" && (
+                          <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+                            LEAD
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-zinc-400">{m.user?.email}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="font-bold text-orange-600">+{m.monthlyAura ?? 0} Aura</div>
+                      <div className="text-[10px] text-zinc-400">earned this month</div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={actionUserId === m.userId}
+                      onClick={() => handleRemoveMember(m.userId, m.user?.name || m.user?.email)}
+                      className="h-7 text-xs px-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200"
+                    >
+                      {actionUserId === m.userId ? "Removing..." : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Section 3: Add Member (with Single-Team Rule Conflict Warning) */}
+        <div className="rounded-2xl border border-orange-100 bg-orange-50/40 p-4">
+          <div className="text-xs font-bold uppercase tracking-wider text-orange-900 mb-2">
+            Include Member in Team
+          </div>
+          <p className="text-xs text-zinc-600 mb-3 leading-relaxed">
+            Select a team member to assign. <b>Single-Team Rule:</b> Each member can belong to at most one team at a time across the organization.
+          </p>
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs font-medium text-zinc-800 focus:border-orange-500 focus:outline-none"
+              >
+                <option value="">-- Choose member to add --</option>
+                {users?.map((u: any) => {
+                  const assignedTeam = allTeams.find((t) => t.members?.some((m: any) => m.userId === u.id));
+                  const inThisTeam = assignedTeam?.id === team.id;
+                  const inOtherTeam = assignedTeam && assignedTeam.id !== team.id;
+
+                  let labelSuffix = " (Available)";
+                  if (inThisTeam) labelSuffix = " [Already in this team]";
+                  else if (inOtherTeam) labelSuffix = ` [Already in "${assignedTeam.name}"]`;
+
+                  return (
+                    <option key={u.id} value={u.id} disabled={inThisTeam}>
+                      {u.name || u.email} — {u.email}{labelSuffix}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div className="flex gap-2">
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="rounded-xl border border-zinc-200 bg-white px-2 py-2 text-xs font-medium text-zinc-800 focus:border-orange-500 focus:outline-none"
+              >
+                <option value="MEMBER">Member</option>
+                <option value="OWNER">Team Lead</option>
+              </select>
+              <Button
+                onClick={handleAddMember}
+                disabled={
+                  !selectedUserId ||
+                  !!conflictingTeam ||
+                  isAlreadyInCurrentTeam ||
+                  isAddingMember
+                }
+                className="flex-1 text-xs bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                {isAddingMember ? "Adding..." : "Add to Team"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Active Conflict Warning Alert */}
+          {conflictingTeam && (
+            <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2.5">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Single-Team Rule Warning: </span>
+                This user is already an active member of <b>&ldquo;{conflictingTeam.name}&rdquo;</b>.
+                A member cannot be included in more than one team simultaneously. Remove them from &ldquo;{conflictingTeam.name}&rdquo; before assigning them here.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="mt-6 flex items-center justify-between border-t border-zinc-100 pt-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleDeleteTeam}
+            className="text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200"
+          >
+            Delete Team
+          </Button>
+          <Button type="button" onClick={close} className="text-xs">
+            Done
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// Database-backed Tag Teams Page with Monthly Team Calculations & Leaderboard
 function TagTeams({
   teams,
+  users,
+  role,
+  notify,
+  onTeamsUpdated,
   openCreateTeam,
 }: {
   teams?: any[];
+  users?: any[];
+  role: string;
+  notify: (s: string) => void;
+  onTeamsUpdated?: () => void;
   openCreateTeam: () => void;
 }) {
   const items = teams && teams.length > 0 ? teams : [];
-  const sortedTeams = [...items].sort((a, b) => (b.combinedAura || 0) - (a.combinedAura || 0));
+  // Sort teams strictly by current month earned Aura
+  const sortedTeams = [...items].sort((a, b) => (b.monthlyAura ?? 0) - (a.monthlyAura ?? 0));
 
   const [aiInsight, setAiInsight] = useState<any | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
+  const [managingTeam, setManagingTeam] = useState<any | null>(null);
+
+  const isAdmin = role === "Admin" || role === "Superadmin";
+  const currentMonthName = new Date().toLocaleString("default", { month: "long", year: "numeric" });
 
   useEffect(() => {
     async function loadInsights() {
@@ -4272,12 +4650,14 @@ function TagTeams({
     <>
       <Head
         title="Tag Teams"
-        copy="A friendly weekly boost of shared momentum and team collaboration."
+        copy="A friendly monthly boost of shared momentum and team collaboration."
         action={
-          <Button onClick={openCreateTeam}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create team
-          </Button>
+          isAdmin ? (
+            <Button onClick={openCreateTeam}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create team
+            </Button>
+          ) : undefined
         }
       />
 
@@ -4295,7 +4675,7 @@ function TagTeams({
 
         {loadingAi ? (
           <div className="mt-3 text-xs text-zinc-500 animate-pulse">
-            Analyzing squad velocities and wall activity...
+            Analyzing squad velocities and monthly activities...
           </div>
         ) : aiInsight ? (
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -4318,64 +4698,194 @@ function TagTeams({
       <div className="grid gap-6 xl:grid-cols-2">
         {/* Active Teams */}
         <div className="space-y-4">
-          <h3 className="font-bold text-lg">Active Tag Teams</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-lg text-zinc-900">Active Tag Teams</h3>
+            <span className="text-xs text-zinc-500">{items.length} Squads configured</span>
+          </div>
+
           {items.length === 0 ? (
-            <Card className="p-8 text-center text-zinc-500">No teams created yet.</Card>
+            <Card className="p-8 text-center text-zinc-500">
+              No teams created yet. {isAdmin && "Click 'Create team' above to form a squad."}
+            </Card>
           ) : (
             items.map((team: any) => (
               <Card className="p-5 overflow-hidden" key={team.id}>
-                <div className="flex justify-between items-start">
-                  <div>
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-amber-600" />
-                      <b className="text-lg">{team.name}</b>
+                      <Users className="h-5 w-5 text-amber-600 shrink-0" />
+                      <b className="text-lg truncate text-zinc-900">{team.name}</b>
                     </div>
-                    <p className="mt-2 text-sm text-zinc-500">
-                      {team.description || "Active collaboration squad."}
-                    </p>
+                    <div className="text-xs text-zinc-400 mt-0.5">
+                      Created by {team.createdBy?.name || team.createdBy?.email || "Admin"}
+                    </div>
                   </div>
-                  <b className="text-orange-600 text-lg">{team.combinedAura || 0} Aura</b>
+
+                  {/* Team Total Monthly Aura Points */}
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center justify-end gap-1.5 text-lg font-black text-orange-600">
+                      <Zap className="h-4 w-4 fill-orange-500 text-orange-600" />
+                      <span>{team.monthlyAura ?? 0} Aura</span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                      Team Total ({currentMonthName})
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-4 pt-3 border-t flex items-center justify-between text-xs text-zinc-500">
-                  <span>
-                    {team.memberCount || team.members?.length || 1} members · Created by{" "}
-                    {team.createdBy?.name || "Admin"}
-                  </span>
-                  <Pill>Active Squad</Pill>
+
+                {/* Team Description */}
+                <div className="mt-3 rounded-xl bg-zinc-50/90 border border-zinc-100 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
+                    Team Description
+                  </div>
+                  <p className="text-xs text-zinc-700 leading-relaxed">
+                    {team.description && team.description.trim() ? team.description : "No description provided."}
+                  </p>
+                </div>
+
+                {/* Team Members & Individual Monthly Aura Points */}
+                <div className="mt-4 pt-3 border-t border-zinc-100">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-xs font-bold text-zinc-700 flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-zinc-500" />
+                      Team Members ({team.members?.length || 0})
+                    </span>
+                    {isAdmin && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setManagingTeam(team)}
+                        className="h-7 text-xs px-2.5 flex items-center gap-1.5 text-zinc-700 hover:text-orange-600 hover:border-orange-200"
+                      >
+                        <Pencil className="h-3 w-3" />
+                        Manage Members
+                      </Button>
+                    )}
+                  </div>
+
+                  {(!team.members || team.members.length === 0) ? (
+                    <div className="rounded-xl border border-dashed border-zinc-200 p-3 text-center text-xs text-zinc-400">
+                      No members assigned yet. Starts at 0 Aura. {isAdmin && "Click 'Manage Members' to assign members."}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {team.members.map((m: any) => (
+                        <div
+                          key={m.userId}
+                          className="flex items-center justify-between rounded-xl border border-zinc-100 bg-white px-3 py-2 text-xs shadow-2xs hover:border-zinc-200 transition"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-orange-100 font-bold text-[11px] text-orange-700">
+                              {(m.user?.name || m.user?.email || "U")[0].toUpperCase()}
+                            </div>
+                            <div className="min-w-0 truncate">
+                              <div className="font-semibold text-zinc-900 flex items-center gap-1.5 truncate">
+                                <span className="truncate">{m.user?.name || m.user?.email}</span>
+                                {m.role === "OWNER" && (
+                                  <span className="rounded-md bg-amber-100 px-1.5 py-0.2 text-[9px] font-bold text-amber-800 shrink-0">
+                                    LEAD
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-zinc-400 truncate">{m.user?.email}</div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0 pl-2">
+                            <span className="font-bold text-orange-600">+{m.monthlyAura ?? 0} Aura</span>
+                            <div className="text-[10px] text-zinc-400">this month</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </Card>
             ))
           )}
         </div>
 
-        {/* Dynamic Leaderboard */}
+        {/* Dynamic Monthly Leaderboard */}
         <Card className="p-5 h-fit">
-          <b>Weekly team leaderboard</b>
-          <p className="text-xs text-zinc-400 mt-1 mb-4">Ranked by combined team member Aura points</p>
+          <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+            <div>
+              <b className="text-base text-zinc-900">Monthly Team Leaderboard</b>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Ranked by team Aura points earned in {currentMonthName}
+              </p>
+            </div>
+            <span className="rounded-full bg-orange-100 px-2.5 py-1 text-[10px] font-bold text-orange-800">
+              {currentMonthName}
+            </span>
+          </div>
+
           {sortedTeams.length === 0 ? (
-            <div className="py-6 text-center text-zinc-500 text-sm">No teams to rank yet.</div>
+            <div className="py-8 text-center text-zinc-400 text-sm">No teams to rank yet.</div>
           ) : (
-            sortedTeams.map((team: any, i: number) => (
-              <div
-                className="mt-3 flex items-center gap-3 rounded-xl bg-zinc-50 p-3 transition hover:bg-orange-50/50"
-                key={team.id}
-              >
-                <b className="w-5 text-zinc-400 text-center">{i + 1}</b>
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-orange-100 text-orange-700 font-bold text-xs">
-                  {team.name.slice(0, 2).toUpperCase()}
-                </span>
-                <span className="flex-1">
-                  <b className="text-sm block">{team.name}</b>
-                  <small className="text-zinc-500">
-                    {team.memberCount || team.members?.length || 1} members
-                  </small>
-                </span>
-                <b className="text-orange-600">{team.combinedAura || 0} Aura</b>
-              </div>
-            ))
+            <div className="mt-4 space-y-2.5">
+              {sortedTeams.map((team: any, i: number) => {
+                const rank = i + 1;
+                return (
+                  <div
+                    className={cn(
+                      "flex items-center gap-3 rounded-2xl p-3 transition border",
+                      rank === 1
+                        ? "border-amber-200 bg-gradient-to-r from-amber-50/70 to-white shadow-2xs"
+                        : rank === 2
+                        ? "border-zinc-200 bg-gradient-to-r from-zinc-50 to-white"
+                        : rank === 3
+                        ? "border-orange-100 bg-gradient-to-r from-orange-50/40 to-white"
+                        : "border-zinc-100 bg-zinc-50/60 hover:bg-zinc-100/60"
+                    )}
+                    key={team.id}
+                  >
+                    <div className="w-6 text-center shrink-0">
+                      {rank === 1 ? (
+                        <span className="text-base">🥇</span>
+                      ) : rank === 2 ? (
+                        <span className="text-base">🥈</span>
+                      ) : rank === 3 ? (
+                        <span className="text-base">🥉</span>
+                      ) : (
+                        <span className="text-xs font-bold text-zinc-400">#{rank}</span>
+                      )}
+                    </div>
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-700 font-bold text-xs">
+                      {team.name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <b className="text-sm block truncate text-zinc-900">{team.name}</b>
+                      <small className="text-zinc-500 text-[11px]">
+                        {team.memberCount || team.members?.length || 0} members
+                      </small>
+                    </span>
+                    <div className="text-right shrink-0">
+                      <b className="text-orange-600 text-sm">{team.monthlyAura ?? 0} Aura</b>
+                      <div className="text-[10px] text-zinc-400">this month</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </Card>
       </div>
+
+      {/* Admin Manage Team Modal */}
+      {managingTeam && (
+        <ManageTeamModal
+          team={managingTeam}
+          allTeams={items}
+          users={users}
+          close={() => setManagingTeam(null)}
+          notify={notify}
+          onUpdated={() => {
+            if (onTeamsUpdated) onTeamsUpdated();
+            // also update current modal team reference if still open
+            const refreshed = items.find((t) => t.id === managingTeam.id);
+            if (refreshed) setManagingTeam(refreshed);
+          }}
+        />
+      )}
     </>
   );
 }

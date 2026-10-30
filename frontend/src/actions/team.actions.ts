@@ -18,6 +18,38 @@ export async function createTeamAction(formData: FormData) {
   return res;
 }
 
+export async function updateTeamAction(teamId: string, data: { name?: string; description?: string }) {
+  const res = await apiClient.put(`/teams/${teamId}`, data);
+  if (res.success) {
+    revalidatePath('/');
+  }
+  return res;
+}
+
+export async function deleteTeamAction(teamId: string) {
+  const res = await apiClient.delete(`/teams/${teamId}`);
+  if (res.success) {
+    revalidatePath('/');
+  }
+  return res;
+}
+
+export async function addTeamMemberAction(teamId: string, userId: string, role: string = 'MEMBER') {
+  const res = await apiClient.post(`/teams/${teamId}/members`, { userId, role });
+  if (res.success) {
+    revalidatePath('/');
+  }
+  return res;
+}
+
+export async function removeTeamMemberAction(teamId: string, userId: string) {
+  const res = await apiClient.delete(`/teams/${teamId}/members/${userId}`);
+  if (res.success) {
+    revalidatePath('/');
+  }
+  return res;
+}
+
 export async function joinTeamAction(formData: FormData) {
   const teamId = formData.get('teamId') as string;
 

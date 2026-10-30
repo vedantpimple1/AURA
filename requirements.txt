@@ -1,0 +1,197 @@
+================================================================================
+KAI AURA — PRODUCTION REQUIREMENTS & DEPLOYMENT SPECIFICATION
+================================================================================
+Target Deployment: Vercel (Frontend Next.js) + Render (Backend API & Worker)
+Database:          Managed PostgreSQL (Render / Neon / Supabase)
+In-Memory Cache:   Redis / Upstash (Optional BullMQ Mode)
+Standard:          ISO/IEC 25010 & 12-Factor App Methodology
+Security Policy:   ZERO CREDENTIAL EXPOSURE (No secrets, tokens, or live URLs)
+================================================================================
+
+1. PRODUCTION CLOUD ARCHITECTURE
+--------------------------------------------------------------------------------
+Frontend Platform:       Vercel (Edge Network, SSR & Global CDN)
+Backend Platform:        Render Web Service (Node.js 20 LTS Environment)
+Background Worker:       Render Background Worker (Node.js 20 LTS Environment)
+Database:                Render Managed PostgreSQL 15/16 (SSL enabled)
+Cache & Queue Broker:    Upstash Redis / Render Redis (TLS enabled)
+Internal API Protocol:   REST / JSON over HTTPS
+Client State / Auth:     Encrypted JWT in HTTP-Only, Secure, SameSite=None Cookies
+
+
+2. RUNTIME & SYSTEM VERSION CONSTRAINTS
+--------------------------------------------------------------------------------
+Node.js Runtime:         >= 20.18.0 LTS (Specified in package.json engine constraint)
+NPM Package Manager:     >= 10.8.0
+PostgreSQL Engine:       >= 15.0 (Tested on PostgreSQL 16)
+Prisma ORM:              7.10.0 (Prisma Client + @prisma/adapter-pg)
+Next.js Framework:       16.3.5 (App Router with Turbopack)
+React Library:           19.2.8
+Express Engine:          4.21.2
+TypeScript Compiler:     5.x
+
+
+3. PRODUCTION DEPENDENCIES (SEPARATED BY TIER)
+--------------------------------------------------------------------------------
+
+[A] FRONTEND TIER (Vercel Build Target)
+Root Directory: frontend/
+Build Command:  npm run build
+Output Directory: .next
+
+Runtime Dependencies:
+  next                       16.3.5
+  react                      19.2.8
+  react-dom                  19.2.8
+  @radix-ui/react-slot       ^1.3.3
+  class-variance-authority   ^0.7.1
+  clsx                       ^2.1.1
+  jose                       ^6.2.12
+  lucide-react               1.45.0
+  tailwind-merge             ^3.7.0
+
+Development Dependencies:
+  @tailwindcss/postcss       ^4.0.0
+  tailwindcss                ^4.0.0
+  typescript                 ^5.0.0
+  eslint                     ^9.0.0
+  eslint-config-next         16.3.5
+  @types/node                ^20.0.0
+  @types/react               ^19.0.0
+  @types/react-dom           ^19.0.0
+
+
+[B] BACKEND API & WORKER TIER (Render Build Target)
+Root Directory: backend/
+Build Command:  npm run build (prisma generate && tsc)
+Start Command:  npm start (node dist/src/server.js)
+Worker Command: npm run worker (tsx --env-file=.env src/worker.ts or node dist/src/worker.js)
+
+Runtime Dependencies:
+  express                    ^4.21.2
+  @prisma/client             7.10.0
+  @prisma/adapter-pg         ^7.10.0
+  pg                         ^8.23.0
+  prisma                     7.10.0
+  jose                       ^6.2.12
+  bcryptjs                   ^3.0.3
+  cookie-parser              ^1.4.7
+  cors                       ^2.8.5
+  dotenv                     ^18.0.4
+  nodemailer                 ^10.0.13
+  bullmq                     ^6.3.11
+  ioredis                    ^6.0.0
+  typescript                 ^5.0.0
+
+Development Dependencies:
+  tsx                        ^4.19.4
+  @types/node                ^20.0.0
+  @types/express             ^5.0.3
+  @types/cors                ^2.8.17
+  @types/cookie-parser       ^1.4.10
+  @types/bcryptjs            ^2.4.6
+  @types/nodemailer          ^8.0.2
+
+
+4. ENVIRONMENT CONFIGURATION SCHEMAS (ZERO SECRETS EXPOSED)
+--------------------------------------------------------------------------------
+NOTE: Live secrets, connection strings, and passwords must NEVER be saved in this
+file or committed to Git. Populate these keys exclusively within the respective
+Vercel and Render Environment Variables dashboards.
+
+[A] Render Dashboard (Backend Web Service & Worker)
+    Settings -> Environment -> Add Environment Variables:
+
+  KEY                          DESCRIPTION / FORMAT
+  ---------------------------  --------------------------------------------------
+  NODE_ENV                     production
+  PORT                         4000 (or Render default 10000)
+  DATABASE_URL                 postgresql://<DB_USER>:<DB_PASS>@<DB_HOST>/<DB_NAME>?sslmode=require
+  JWT_SECRET                   <STRONG_64_CHAR_HEX_SECRET>
+  FRONTEND_URL                 https://aura-nu-green.vercel.app/
+  APP_URL                      https://aura-nu-green.vercel.app/
+
+  DELIVERY_WORKER_INTERVAL_MS  10000
+  DELIVERY_WORKER_BATCH_SIZE   20
+  DELIVERY_WORKER_MAX_RETRIES  3
+  QUEUE_ENABLED                false (Set "false" to use built-in DB polling without Redis)
+  REDIS_URL                    redis://localhost:6379 (OPTIONAL: Only needed if QUEUE_ENABLED=true)
+
+
+[B] Vercel Dashboard (Frontend Project)
+    Settings -> Environment Variables:
+
+  KEY                          DESCRIPTION / FORMAT
+  ---------------------------  --------------------------------------------------
+  NODE_ENV                     production
+  API_URL                      https://kai-aura-api.onrender.com/api  (IMPORTANT: MUST end with /api)
+  NEXT_PUBLIC_API_URL          https://kai-aura-api.onrender.com/api  (IMPORTANT: MUST end with /api)
+  NEXT_PUBLIC_APP_URL          https://aura-nu-green.vercel.app/
+  JWT_SECRET                   <MUST_BE_IDENTICAL_TO_BACKEND_JWT_SECRET>
+
+
+5. REDIS EXPLANATION: IS IT IMPLEMENTED & DO YOU NEED IT?
+--------------------------------------------------------------------------------
+1. Redis implementation
+   YES. Full BullMQ + ioredis queue architecture is implemented in:
+   - src/services/queue/queue.config.ts
+   - src/services/queue/notification.worker.ts
+   - src/services/queue/notification.queue.ts
+
+AURA has an automatic dual-mode fallback:
+   - When QUEUE_ENABLED="false" (default), the delivery worker automatically
+     uses DATABASE POLLING MODE.
+   - It polls PostgreSQL every 10 seconds for pending notification emails and
+     dispatches them asynchronously with ZERO Redis setup and ZERO cost.
+
+3. From where do you get REDIS_URL if you ever want Redis (for 500+ scale)?
+   - On Render: Click "New +" -> "Redis" (Render generates an internal/external Redis URL).
+   - On Upstash: Free cloud Redis at https://upstash.com (Copy Redis URL).
+   - On AWS: AWS ElastiCache for Redis endpoint.
+   - On Azure: Azure Cache for Redis primary connection string.
+
+
+6. COMPLETE DATABASE & PRISMA SETUP ON AZURE / AWS / LINUX
+--------------------------------------------------------------------------------
+The commands below set up the entire database from scratch on AWS RDS, Azure
+PostgreSQL, or an Ubuntu Linux VM:
+
+Step 1: Create Database & User (in PostgreSQL / Cloud Console):
+  CREATE USER aura_user WITH PASSWORD 'YourStrongPassword123!';
+  CREATE DATABASE aura_db OWNER aura_user;
+  GRANT ALL PRIVILEGES ON DATABASE aura_db TO aura_user;
+
+Step 2: Set the Connection String in backend/.env:
+  AWS RDS:
+    DATABASE_URL="postgresql://aura_user:YourStrongPassword123!@<rds-endpoint>.amazonaws.com:5432/aura_db?sslmode=require"
+  Azure PostgreSQL:
+    DATABASE_URL="postgresql://aura_user:YourStrongPassword123!@<server-name>.postgres.database.azure.com:5432/aura_db?sslmode=require"
+  Render / Neon:
+    DATABASE_URL="postgresql://aura_user:YourStrongPassword123!@<host>:5432/aura_db?sslmode=require"
+
+Step 3: Run Prisma Migrations & Seed (cd backend):
+  1. Generate Prisma Client:
+     npx prisma generate
+
+  2. Apply All SQL Migrations (creates 23 tables, foreign keys & indexes):
+     npx prisma migrate deploy
+
+  3. Seed Production Roles, Superadmin, Admin, Member & Store Catalog:
+     npm run db:seed
+     (Creates SUPERADMIN, ADMIN, USER, RECOVERY_OPERATOR roles & default items)
+
+  4. (Optional) Open Web Database Browser:
+     npx prisma studio
+
+
+
+6. HEALTH CHECK & OPERATIONAL VERIFICATION
+--------------------------------------------------------------------------------
+Backend API Status:      GET https://kai-aura-api.onrender.com/api/health
+Expected Output:         HTTP 200 {"status":"ok","timestamp":"..."}
+Frontend Web Portal:     GET https://aura-nu-green.vercel.app/
+
+================================================================================
+END OF REQUIREMENTS SPECIFICATION
+================================================================================
+

@@ -1,6 +1,7 @@
 'use server';
 
 import { apiClient } from '@/lib/api-client';
+import { revalidatePath } from 'next/cache';
 
 export async function getUserAction(userId: string) {
   return await apiClient.get(`/users/${userId}`);
@@ -18,5 +19,17 @@ export async function createUserAction(formData: FormData) {
     roleName: formData.get('roleName') as string,
     teamId: (formData.get('teamId') as string) || undefined,
   };
-  return await apiClient.post('/users', data);
+  const res = await apiClient.post('/users', data);
+  if (res.success) {
+    revalidatePath('/');
+  }
+  return res;
+}
+
+export async function deleteUserAction(userId: string) {
+  const res = await apiClient.delete(`/users/${userId}`);
+  if (res.success) {
+    revalidatePath('/');
+  }
+  return res;
 }
