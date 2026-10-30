@@ -5,9 +5,9 @@ import { NotificationService } from './notification.service';
 
 export class KudosService {
   /**
-   * Sends peer Kudos and awards a small Aura bonus (+10) to the receiver.
+   * Sends peer Kudos and awards an Aura bonus to the receiver.
    */
-  static async sendKudos(data: { senderId: string; receiverId: string; message: string }) {
+  static async sendKudos(data: { senderId: string; receiverId: string; message: string; amount?: number }) {
     if (!data.senderId || !data.receiverId || !data.message?.trim()) {
       throw new ValidationError('Sender, recipient, and a message are required');
     }
@@ -15,6 +15,10 @@ export class KudosService {
     if (data.senderId === data.receiverId) {
       throw new ValidationError('You cannot send Kudos to yourself');
     }
+
+    const auraAmount = typeof data.amount === 'number' && Number.isFinite(data.amount) && data.amount > 0
+      ? Math.min(Math.floor(data.amount), 1000)
+      : 10;
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create Kudos record
@@ -30,12 +34,12 @@ export class KudosService {
         }
       });
 
-      // 2. Award 10 Aura to the receiver as social recognition
+      // 2. Award Aura to the receiver as social recognition
       await tx.auraTransaction.create({
         data: {
           userId: data.receiverId,
           type: 'KUDOS',
-          amount: 10,
+          amount: auraAmount,
           description: `Received Kudos: "${data.message.slice(0, 40)}"`,
           sourceType: 'SOCIAL',
           sourceId: kudos.id,
@@ -51,8 +55,8 @@ export class KudosService {
         userId: data.receiverId,
         type: 'KUDOS_RECEIVED',
         title: 'Kudos Received! 🌟',
-        message: `${result.sender?.name || 'A teammate'} recognized you on the Aura Wall: "${data.message.trim().slice(0, 75)}" (+10 Aura)`,
-        metadata: { kudosId: result.id, senderId: data.senderId },
+        message: `${result.sender?.name || 'A teammate'} recognized you on the Aura Wall: "${data.message.trim().slice(0, 75)}" (+${auraAmount} Aura)`,
+        metadata: { kudosId: result.id, senderId: data.senderId, amount: auraAmount },
       });
     } catch (e) {
       console.error('Non-blocking notification error:', e);

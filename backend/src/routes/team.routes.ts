@@ -77,13 +77,13 @@ teamRouter.get('/kudos', requireAuth, async (_req: Request, res: Response): Prom
 });
 
 /**
- * POST /api/teams/kudos
- * Sends kudos from the logged-in user to a receiver.
+ * Handler for sending Kudos (supports both /api/teams/kudos and /api/teams/kudos/send)
+ * Sends kudos from the logged-in user to a receiver and awards Aura points.
  */
-teamRouter.post('/kudos', requireAuth, async (req: Request, res: Response): Promise<void> => {
+const handleSendKudos = async (req: Request, res: Response): Promise<void> => {
   try {
     const session = req.session!;
-    const { receiverId, message } = req.body as { receiverId?: string; message?: string };
+    const { receiverId, message, amount } = req.body as { receiverId?: string; message?: string; amount?: number };
 
     if (!receiverId || !message) {
       res.status(400).json({ success: false, error: 'receiverId and message are required', code: 'VALIDATION_ERROR' });
@@ -94,6 +94,7 @@ teamRouter.post('/kudos', requireAuth, async (req: Request, res: Response): Prom
       senderId: session.userId,
       receiverId,
       message,
+      amount: typeof amount === 'number' && amount > 0 ? amount : 10,
     });
 
     res.status(201).json({ success: true, data: kudos });
@@ -101,4 +102,7 @@ teamRouter.post('/kudos', requireAuth, async (req: Request, res: Response): Prom
     const { statusCode, ...body } = handleError(error) as any;
     res.status(statusCode ?? 500).json({ success: false, ...body });
   }
-});
+};
+
+teamRouter.post('/kudos', requireAuth, handleSendKudos);
+teamRouter.post('/kudos/send', requireAuth, handleSendKudos);

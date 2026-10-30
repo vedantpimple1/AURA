@@ -35,8 +35,14 @@ export async function getKudosAction() {
 export async function sendKudosAction(formData: FormData) {
   const receiverId = formData.get('receiverId') as string;
   const message = formData.get('message') as string;
+  const amountStr = formData.get('amount') as string;
+  const amount = amountStr ? parseInt(amountStr, 10) : 10;
 
-  const res = await apiClient.post('/teams/kudos/send', { receiverId, message });
+  const res = await apiClient.post('/teams/kudos', {
+    receiverId,
+    message,
+    amount: Number.isFinite(amount) && amount > 0 ? amount : 10,
+  });
   if (res.success) {
     revalidatePath('/');
   }

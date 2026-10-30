@@ -248,6 +248,7 @@ export function AuraApp({
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showSendKudos, setShowSendKudos] = useState(false);
+  const [selectedKudosUser, setSelectedKudosUser] = useState<any | null>(null);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
 
   // Notifications & Global Search state
@@ -691,14 +692,28 @@ export function AuraApp({
           )}
           {page === "reviews" && <Reviews notify={notify} initialTasks={initialTasks} />}
           {page === "members" && (
-            <Members notify={notify} openAddUser={() => setShowAddUser(true)} users={initialUsers} currentUser={currentUser} role={role} />
+            <Members
+              notify={notify}
+              openAddUser={() => setShowAddUser(true)}
+              users={initialUsers}
+              currentUser={currentUser}
+
+              role={role}
+              onSendKudos={(targetUser) => {
+                setSelectedKudosUser(targetUser);
+                setShowSendKudos(true);
+              }}
+            />
           )}
           {page === "leaderboard" && <Leaderboard users={initialUsers} />}
           {page === "wall" && (
             <Wall
               notify={notify}
               kudos={initialKudos}
-              openSendKudos={() => setShowSendKudos(true)}
+              openSendKudos={() => {
+                setSelectedKudosUser(null);
+                setShowSendKudos(true);
+              }}
               initialTasks={initialTasks}
             />
           )}
@@ -815,13 +830,20 @@ export function AuraApp({
       )}
       {showSendKudos && (
         <SendKudosModal
-          close={() => setShowSendKudos(false)}
+          close={() => {
+            setShowSendKudos(false);
+            setSelectedKudosUser(null);
+          }}
           notify={notify}
           onSuccess={() => {
             setShowSendKudos(false);
+            setSelectedKudosUser(null);
             window.location.reload();
           }}
           users={initialUsers}
+          preselectedUser={selectedKudosUser}
+          currentUser={currentUser}
+          isAdmin={role === "Admin" || role === "Superadmin"}
         />
       )}
       {showCreateTeam && (
@@ -3324,12 +3346,14 @@ function Members({
   users = [],
   currentUser,
   role = "Member",
+  onSendKudos,
 }: {
   notify: (s: string) => void;
   openAddUser: () => void;
   users?: any[];
   currentUser?: any;
   role?: string;
+  onSendKudos?: (user: any) => void;
 }) {
   const [memberList, setMemberList] = useState<any[]>(users && users.length > 0 ? users : []);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -3391,17 +3415,31 @@ function Members({
                     </small>
                   </span>
                 </div>
-                {canDelete && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(u)}
-                    className="border-red-200 text-red-600 hover:bg-red-50 p-2 h-auto"
-                    title="Delete member"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {onSendKudos && u.id !== currentUser?.id && u.email !== currentUser?.email && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onSendKudos(u)}
+                      className="border-amber-200 text-amber-700 hover:bg-amber-50 p-2 h-auto text-xs flex items-center gap-1 font-semibold"
+                      title={`Send Kudos to ${name}`}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                      Kudos
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(u)}
+                      className="border-red-200 text-red-600 hover:bg-red-50 p-2 h-auto"
+                      title="Delete member"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </Card>
           );
@@ -3454,19 +3492,33 @@ function Members({
                     </td>
                     <td className="p-4 text-zinc-500 text-xs">{joinedDate}</td>
                     <td className="p-4">
-                      {canDelete ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(u)}
-                          className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 text-xs flex items-center gap-1"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-zinc-300">—</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {onSendKudos && u.id !== currentUser?.id && u.email !== currentUser?.email && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onSendKudos(u)}
+                            className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800 text-xs flex items-center gap-1 font-semibold"
+                            title={`Send Kudos to ${name}`}
+                          >
+                            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                            Kudos
+                          </Button>
+                        )}
+                        {canDelete ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(u)}
+                            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 text-xs flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        ) : (
+                          !onSendKudos && <span className="text-xs text-zinc-300">—</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -3910,33 +3962,58 @@ const KUDOS_REACTION_OPTIONS = [
   { id: "clap", emoji: "👏", label: "Standing Ovation", desc: "Major milestone celebration" },
 ];
 
-// Send Kudos Reaction Modal (Reactions only, no text message)
+// Send Kudos Reaction & Recognition Modal
 function SendKudosModal({
   close,
   notify,
   onSuccess,
   users,
+  preselectedUser,
+  currentUser,
+  isAdmin = false,
 }: {
   close: () => void;
   notify: (s: string) => void;
   onSuccess: () => void;
   users: any[];
+  preselectedUser?: any;
+  currentUser?: any;
+  isAdmin?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [selectedReaction, setSelectedReaction] = useState(KUDOS_REACTION_OPTIONS[0]);
+  const [receiverId, setReceiverId] = useState(preselectedUser?.id || "");
+  const [customNote, setCustomNote] = useState("");
+  const [auraAmount, setAuraAmount] = useState(10);
+
+  const eligibleUsers = (users || []).filter(
+    (u) => u.id !== currentUser?.id && u.email !== currentUser?.email
+  );
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!receiverId) {
+      notify("Please select a teammate to send Kudos to.");
+      return;
+    }
     setLoading(true);
-    const fd = new FormData(e.currentTarget);
-    // Explicitly set the chosen reaction as message for backend compatibility
-    fd.set("message", `${selectedReaction.emoji} ${selectedReaction.label}`);
+    const fd = new FormData();
+    fd.set("receiverId", receiverId);
+    const note = customNote.trim();
+    const finalMsg = note
+      ? `${selectedReaction.emoji} ${selectedReaction.label}: ${note}`
+      : `${selectedReaction.emoji} ${selectedReaction.label}`;
+    fd.set("message", finalMsg);
+    fd.set("amount", String(auraAmount));
+
     const res = await sendKudosAction(fd);
     if (res.success) {
-      notify(`Kudos reaction sent! +10 Aura awarded to teammate.`);
+      const targetUser = users.find((u) => u.id === receiverId);
+      const recipientName = targetUser?.name || targetUser?.email || "Teammate";
+      notify(`Kudos sent to ${recipientName}! +${auraAmount} Aura points awarded.`);
       onSuccess();
     } else {
-      notify((res as any).error || "Failed to send Kudos reaction");
+      notify((res as any).error || "Failed to send Kudos");
       setLoading(false);
     }
   }
@@ -3950,8 +4027,8 @@ function SendKudosModal({
               <Sparkles className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="text-lg font-bold text-zinc-900">React with Kudos</h3>
-              <p className="text-xs text-zinc-500">Pick a teammate and select a reaction option</p>
+              <h3 className="text-lg font-bold text-zinc-900">Send Kudos</h3>
+              <p className="text-xs text-zinc-500">Recognize a teammate and boost their Aura on the team wall</p>
             </div>
           </div>
           <button onClick={close} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">
@@ -3966,11 +4043,13 @@ function SendKudosModal({
             </label>
             <select
               name="receiverId"
+              value={receiverId}
+              onChange={(e) => setReceiverId(e.target.value)}
               required
               className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-sm font-medium focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
             >
               <option value="">-- Choose a teammate --</option>
-              {users.map((u) => (
+              {eligibleUsers.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name || u.email} ({u.email})
                 </option>
@@ -3986,7 +4065,7 @@ function SendKudosModal({
               <span className="text-[11px] font-semibold text-orange-600">Tap to choose</span>
             </div>
             {/* Grid of Reaction Options */}
-            <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
+            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
               {KUDOS_REACTION_OPTIONS.map((r) => {
                 const isSelected = selectedReaction.id === r.id;
                 return (
@@ -4012,19 +4091,70 @@ function SendKudosModal({
             </div>
           </div>
 
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5 block">
+              Personal Note <span className="text-zinc-400 font-normal lowercase">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={customNote}
+              onChange={(e) => setCustomNote(e.target.value)}
+              placeholder="e.g. Incredible effort launching the core feature this week!"
+              className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-sm font-medium focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-600">
+                Aura Points to Award
+              </label>
+              <span className="text-xs font-black text-orange-600">+{auraAmount} Aura</span>
+            </div>
+            {isAdmin ? (
+              <div className="flex items-center gap-2">
+                {[10, 25, 50, 100].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setAuraAmount(amt)}
+                    className={cn(
+                      "flex-1 rounded-xl py-2 text-xs font-bold transition border",
+                      auraAmount === amt
+                        ? "bg-orange-600 text-white border-orange-600 shadow-xs"
+                        : "bg-white text-zinc-700 border-zinc-200 hover:border-orange-300 hover:bg-orange-50/50"
+                    )}
+                  >
+                    +{amt}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl bg-orange-50 border border-orange-200/60 p-2.5 text-xs text-orange-800 font-medium flex items-center justify-between">
+                <span>Standard social recognition bonus</span>
+                <span className="font-bold">+10 Aura</span>
+              </div>
+            )}
+          </div>
+
           {/* Selected Reaction Spotlight Banner */}
           <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-3.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-3xl animate-bounce">{selectedReaction.emoji}</span>
               <div>
                 <p className="text-xs font-bold text-zinc-900">
-                  Reaction: <span className="text-orange-700">{selectedReaction.label}</span>
+                  {selectedReaction.label}
+                  {customNote.trim() && (
+                    <span className="block text-[11px] text-zinc-600 font-normal italic mt-0.5">
+                      "{customNote.trim()}"
+                    </span>
+                  )}
                 </p>
                 <p className="text-[11px] text-zinc-500">{selectedReaction.desc}</p>
               </div>
             </div>
             <span className="rounded-full bg-orange-600 px-2.5 py-1 text-xs font-black text-white shadow-xs">
-              +10 Aura
+              +{auraAmount} Aura
             </span>
           </div>
 
@@ -4033,7 +4163,7 @@ function SendKudosModal({
               Cancel
             </Button>
             <Button type="submit" disabled={loading} className="bg-orange-600 hover:bg-orange-700 text-white font-bold">
-              {loading ? "Reacting..." : `Send Reaction (+10 Aura)`}
+              {loading ? "Sending..." : `Send Kudos (+${auraAmount} Aura)`}
             </Button>
           </div>
         </form>
